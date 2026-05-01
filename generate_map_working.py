@@ -82,9 +82,13 @@ groups = df.groupby('date')
 # 准备数据
 all_data = {}
 for date, group in groups:
+    group = group.copy()
+    group['geoTimeNumber'] = pd.to_numeric(group['geoTime'], errors='coerce')
+    group = group.sort_values('geoTimeNumber')
     points = []
     elevations = []
     speeds = []
+    timestamps = []
     times = []
     for _, row in group.iterrows():
         lat = float(row['latitude'])
@@ -95,6 +99,7 @@ for date, group in groups:
         
         # 转换时间戳为可读时间
         timestamp = int(row['geoTime'])
+        timestamps.append(timestamp)
         dt = datetime.datetime.fromtimestamp(timestamp / 1000, datetime.timezone.utc).astimezone(LOCAL_TIMEZONE)
         times.append(dt.strftime('%H:%M:%S'))
     
@@ -103,12 +108,14 @@ for date, group in groups:
     all_data[date] = {
         'count': len(points),
         'points': points,
+        'timestamps': timestamps,
         'elevations': elevations,
         'altitude_min': min(valid_elevations) if valid_elevations else None,
         'altitude_max': max(valid_elevations) if valid_elevations else None,
         'speeds': speeds,
         'speed_min': min(valid_speeds) if valid_speeds else None,
         'speed_max': max(valid_speeds) if valid_speeds else None,
+        'times': times,
         'start_time': min(times),
         'end_time': max(times)
     }
@@ -148,6 +155,9 @@ html_template = '''<!DOCTYPE html>
         .tile-selector { margin-top:10px; }
         .tile-selector label { display:block; margin-bottom:5px; color:#666; font-size:12px; }
         .tile-selector select { width:100%; padding:5px; border:1px solid #ddd; border-radius:4px; font-size:12px; }
+        .segment-selector { margin-top:10px; }
+        .segment-selector label { display:block; margin-bottom:5px; color:#666; font-size:12px; }
+        .segment-selector select { width:100%; padding:5px; border:1px solid #ddd; border-radius:4px; font-size:12px; }
         .mode-button { width:100%; margin-top:10px; padding:8px; border:1px solid #ccd6e0; border-radius:4px; background:#f8fbff; color:#2c5c86; font-size:13px; font-family:"Microsoft YaHei",Arial,sans-serif; cursor:pointer; }
         .mode-button.active { background:#2c5c86; border-color:#2c5c86; color:white; }
         .metric-legend { display:none; margin-top:10px; padding-top:10px; border-top:1px solid #eee; }
@@ -179,6 +189,12 @@ html_template += '''            </select>
         <div class="coord-info">📌 已启用坐标纠正（国内APP数据→WGS84）</div>
         <button id="altitudeToggle" class="mode-button" type="button" onclick="toggleAltitudeMode()">海拔路径：关闭</button>
         <button id="speedToggle" class="mode-button" type="button" onclick="toggleSpeedMode()">速度路径：关闭</button>
+        <div class="segment-selector">
+            <label>🧭 路径段:</label>
+            <select id="segmentSelect" onchange="changeSegment()">
+                <option value="all">全部路径</option>
+            </select>
+        </div>
         <div class="tile-selector">
             <label>🗺️ 地图源:</label>
             <select id="tileSelect" onchange="changeTile()">
@@ -203,6 +219,10 @@ html_template += '''            </select>
             <div class="info-item">
                 <div class="label">速度范围</div>
                 <div class="value" id="speedRange">-</div>
+            </div>
+            <div class="info-item">
+                <div class="label">路径段数</div>
+                <div class="value" id="segmentCount">-</div>
             </div>
         </div>
     </div>
@@ -244,6 +264,10 @@ var currentLayer = null;
 var metricLayer = null;
 var currentDate = null;
 var activeMetric = null;
+var currentCorrectedPoints = [];
+var currentSegments = [];
+var selectedSegment = 'all';
+var segmentGapThresholdMs = 60 * 60 * 1000;
 
 function changeTile() {
     var tileType = document.getElementById('tileSelect').value;
@@ -274,6 +298,50 @@ function metricValues(data, metric) {
         return { values: data.speeds, min: data.speed_min, max: data.speed_max };
     }
     return { values: data.elevations, min: data.altitude_min, max: data.altitude_max };
+}
+
+function buildSegments(data) {
+    var segments = [];
+    if (!data || !data.points || data.points.length === 0) return segments;
+
+    var start = 0;
+    for (var i = 1; i < data.points.length; i++) {
+        var previousTime = data.timestamps ? data.timestamps[i - 1] : null;
+        var currentTime = data.timestamps ? data.timestamps[i] : null;
+        if (previousTime !== null && currentTime !== null && currentTime - previousTime > segmentGapThresholdMs) {
+            segments.push({ start: start, end: i - 1 });
+            start = i;
+        }
+    }
+    segments.push({ start: start, end: data.points.length - 1 });
+    return segments;
+}
+
+function segmentOpacity(segmentIndex) {
+    return selectedSegment === 'all' || Number(selectedSegment) === segmentIndex ? 0.85 : 0.3;
+}
+
+function segmentLabel(data, segment, index) {
+    var startTime = data.times && data.times[segment.start] ? data.times[segment.start] : '';
+    var endTime = data.times && data.times[segment.end] ? data.times[segment.end] : '';
+    var count = segment.end - segment.start + 1;
+    return '路径 ' + (index + 1) + ' (' + count + '点, ' + startTime + '-' + endTime + ')';
+}
+
+function populateSegmentSelector(data) {
+    var selector = document.getElementById('segmentSelect');
+    selector.innerHTML = '<option value="all">全部路径</option>';
+    currentSegments.forEach(function(segment, index) {
+        var option = document.createElement('option');
+        option.value = String(index);
+        option.textContent = segmentLabel(data, segment, index);
+        selector.appendChild(option);
+    });
+    if (selectedSegment !== 'all' && Number(selectedSegment) >= currentSegments.length) {
+        selectedSegment = 'all';
+    }
+    selector.value = selectedSegment;
+    document.getElementById('segmentCount').textContent = currentSegments.length + ' 段';
 }
 
 var gradientStops = [
@@ -313,6 +381,21 @@ function clearMetricLayer() {
     }
 }
 
+function drawBaseTrack(data, correctedPoints) {
+    currentLayer = L.layerGroup().addTo(map);
+    currentSegments.forEach(function(segment, segmentIndex) {
+        if (segment.end <= segment.start) return;
+        var segmentPoints = correctedPoints.slice(segment.start, segment.end + 1);
+        L.polyline(segmentPoints, {
+            color: '#3388ff',
+            weight: 5,
+            opacity: segmentOpacity(segmentIndex),
+            lineCap: 'round',
+            lineJoin: 'round'
+        }).addTo(currentLayer);
+    });
+}
+
 function drawMetricLayer(data, correctedPoints) {
     clearMetricLayer();
     if (!activeMetric || !data) return;
@@ -322,37 +405,39 @@ function drawMetricLayer(data, correctedPoints) {
 
     metricLayer = L.layerGroup().addTo(map);
     var stepsPerSegment = 8;
-    for (var i = 0; i < correctedPoints.length - 1; i++) {
-        var startValue = metric.values[i];
-        var endValue = metric.values[i + 1];
-        if (startValue === null || startValue === undefined || !isFinite(startValue)) continue;
-        if (endValue === null || endValue === undefined || !isFinite(endValue)) continue;
-        var startPoint = correctedPoints[i];
-        var endPoint = correctedPoints[i + 1];
-        for (var step = 0; step < stepsPerSegment; step++) {
-            var t1 = step / stepsPerSegment;
-            var t2 = (step + 1) / stepsPerSegment;
-            var midT = (t1 + t2) / 2;
-            var segmentValue = startValue + (endValue - startValue) * midT;
-            var color = colorForMetric(segmentValue, metric.min, metric.max);
-            var segmentStart = [
-                startPoint[0] + (endPoint[0] - startPoint[0]) * t1,
-                startPoint[1] + (endPoint[1] - startPoint[1]) * t1
-            ];
-            var segmentEnd = [
-                startPoint[0] + (endPoint[0] - startPoint[0]) * t2,
-                startPoint[1] + (endPoint[1] - startPoint[1]) * t2
-            ];
-            L.polyline([segmentStart, segmentEnd], {
-                color: color,
-                weight: 7,
-                opacity: 0.95,
-                lineCap: 'round',
-                lineJoin: 'round'
-            }).addTo(metricLayer)
-              .bindPopup('<b>' + metricLabel(activeMetric) + '</b><br>起点: ' + formatMetric(activeMetric, startValue) + '<br>终点: ' + formatMetric(activeMetric, endValue));
+    currentSegments.forEach(function(trackSegment, trackSegmentIndex) {
+        for (var i = trackSegment.start; i < trackSegment.end; i++) {
+            var startValue = metric.values[i];
+            var endValue = metric.values[i + 1];
+            if (startValue === null || startValue === undefined || !isFinite(startValue)) continue;
+            if (endValue === null || endValue === undefined || !isFinite(endValue)) continue;
+            var startPoint = correctedPoints[i];
+            var endPoint = correctedPoints[i + 1];
+            for (var step = 0; step < stepsPerSegment; step++) {
+                var t1 = step / stepsPerSegment;
+                var t2 = (step + 1) / stepsPerSegment;
+                var midT = (t1 + t2) / 2;
+                var segmentValue = startValue + (endValue - startValue) * midT;
+                var color = colorForMetric(segmentValue, metric.min, metric.max);
+                var segmentStart = [
+                    startPoint[0] + (endPoint[0] - startPoint[0]) * t1,
+                    startPoint[1] + (endPoint[1] - startPoint[1]) * t1
+                ];
+                var segmentEnd = [
+                    startPoint[0] + (endPoint[0] - startPoint[0]) * t2,
+                    startPoint[1] + (endPoint[1] - startPoint[1]) * t2
+                ];
+                L.polyline([segmentStart, segmentEnd], {
+                    color: color,
+                    weight: 7,
+                    opacity: selectedSegment === 'all' || Number(selectedSegment) === trackSegmentIndex ? 0.95 : 0.3,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                }).addTo(metricLayer)
+                  .bindPopup('<b>' + metricLabel(activeMetric) + '</b><br>起点: ' + formatMetric(activeMetric, startValue) + '<br>终点: ' + formatMetric(activeMetric, endValue));
+            }
         }
-    }
+    });
 }
 
 function updateMetricUi(data) {
@@ -407,26 +492,68 @@ function applyMetricMode() {
     drawMetricLayer(data, correctTrackPoints(data.points));
 }
 
+function redrawCurrentTrack() {
+    if (!allData || !currentDate) return;
+    var data = allData[currentDate];
+    if (currentLayer) {
+        map.removeLayer(currentLayer);
+        currentLayer = null;
+    }
+    clearMetricLayer();
+    drawBaseTrack(data, currentCorrectedPoints);
+    drawEndpointMarkers(data, currentCorrectedPoints);
+    drawMetricLayer(data, currentCorrectedPoints);
+}
+
+function changeSegment() {
+    selectedSegment = document.getElementById('segmentSelect').value;
+    redrawCurrentTrack();
+}
+
+function drawEndpointMarkers(data, points) {
+    if (!currentLayer || !points || points.length === 0) return;
+    var startIndex = 0;
+    var endIndex = points.length - 1;
+    var label = '全部路径';
+    if (selectedSegment !== 'all') {
+        var segmentIndex = Number(selectedSegment);
+        var segment = currentSegments[segmentIndex];
+        if (segment) {
+            startIndex = segment.start;
+            endIndex = segment.end;
+            label = '路径 ' + (segmentIndex + 1);
+        }
+    }
+
+    var startPoint = points[startIndex];
+    var endPoint = points[endIndex];
+    var startTime = data.times && data.times[startIndex] ? data.times[startIndex] : data.start_time;
+    var endTime = data.times && data.times[endIndex] ? data.times[endIndex] : data.end_time;
+
+    L.marker(startPoint, { title:'起点' }).addTo(currentLayer)
+        .bindPopup('<b>🟢 起点</b><br>' + label + '<br>时间: ' + startTime + '<br>坐标: ' + startPoint[0].toFixed(6) + ', ' + startPoint[1].toFixed(6));
+    if (endIndex !== startIndex) {
+        L.marker(endPoint, { title:'终点' }).addTo(currentLayer)
+            .bindPopup('<b>🔴 终点</b><br>' + label + '<br>时间: ' + endTime + '<br>坐标: ' + endPoint[0].toFixed(6) + ', ' + endPoint[1].toFixed(6));
+    }
+}
+
 function loadTrack(date) {
     if (!allData) return;
     
     currentDate = date;
+    selectedSegment = 'all';
     if (currentLayer) { map.removeLayer(currentLayer); }
     clearMetricLayer();
     var data = allData[date];
     if (!data || data.points.length === 0) { alert('该日期没有轨迹数据！'); return; }
     var points = correctTrackPoints(data.points);
-    currentLayer = L.layerGroup().addTo(map);
-    var polyline = L.polyline(points, { color:'#3388ff', weight:5, opacity:0.8 }).addTo(currentLayer);
-    if (points.length > 0) {
-        L.marker(points[0], { title:'起点' }).addTo(currentLayer)
-            .bindPopup('<b>🟢 起点</b><br>时间: ' + data.start_time + '<br>坐标: ' + points[0][0].toFixed(6) + ', ' + points[0][1].toFixed(6));
-    }
-    if (points.length > 1) {
-        L.marker(points[points.length-1], { title:'终点' }).addTo(currentLayer)
-            .bindPopup('<b>🔴 终点</b><br>时间: ' + data.end_time + '<br>坐标: ' + points[points.length-1][0].toFixed(6) + ', ' + points[points.length-1][1].toFixed(6));
-    }
-    map.fitBounds(polyline.getBounds(), { padding:[50, 50] });
+    currentCorrectedPoints = points;
+    currentSegments = buildSegments(data);
+    populateSegmentSelector(data);
+    drawBaseTrack(data, points);
+    drawEndpointMarkers(data, points);
+    map.fitBounds(L.latLngBounds(points), { padding:[50, 50] });
     document.getElementById('pointCount').textContent = data.count + ' 个点';
     document.getElementById('timeRange').textContent = data.start_time + ' - ' + data.end_time;
     updateMetricUi(data);
