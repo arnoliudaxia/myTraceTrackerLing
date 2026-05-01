@@ -1,6 +1,7 @@
 import json
 import pandas as pd
 import datetime
+import math
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -38,6 +39,36 @@ def ensure_date_column(dataframe):
     raise ValueError('CSV 中缺少 date、dayTime 或 geoTime 字段，无法按日期分组')
 
 
+def read_altitude(row):
+    """Return a finite altitude value in meters, or None when unavailable."""
+    if 'altitude' not in row:
+        return None
+
+    try:
+        altitude = float(row['altitude'])
+    except (TypeError, ValueError):
+        return None
+
+    if not math.isfinite(altitude):
+        return None
+    return altitude
+
+
+def read_speed(row):
+    """Return a finite speed value in m/s, or None when unavailable."""
+    if 'speed' not in row:
+        return None
+
+    try:
+        speed = float(row['speed'])
+    except (TypeError, ValueError):
+        return None
+
+    if not math.isfinite(speed):
+        return None
+    return speed
+
+
 # 读取当前CSV。filter_csv_days.py 会直接清洗并覆盖这个文件。
 df = pd.read_csv(CSV_FILE)
 df = ensure_date_column(df)
@@ -52,20 +83,32 @@ groups = df.groupby('date')
 all_data = {}
 for date, group in groups:
     points = []
+    elevations = []
+    speeds = []
     times = []
     for _, row in group.iterrows():
         lat = float(row['latitude'])
         lng = float(row['longitude'])
         points.append([lat, lng])
+        elevations.append(read_altitude(row))
+        speeds.append(read_speed(row))
         
         # 转换时间戳为可读时间
         timestamp = int(row['geoTime'])
         dt = datetime.datetime.fromtimestamp(timestamp / 1000, datetime.timezone.utc).astimezone(LOCAL_TIMEZONE)
         times.append(dt.strftime('%H:%M:%S'))
     
+    valid_elevations = [elevation for elevation in elevations if elevation is not None]
+    valid_speeds = [speed for speed in speeds if speed is not None]
     all_data[date] = {
         'count': len(points),
         'points': points,
+        'elevations': elevations,
+        'altitude_min': min(valid_elevations) if valid_elevations else None,
+        'altitude_max': max(valid_elevations) if valid_elevations else None,
+        'speeds': speeds,
+        'speed_min': min(valid_speeds) if valid_speeds else None,
+        'speed_max': max(valid_speeds) if valid_speeds else None,
         'start_time': min(times),
         'end_time': max(times)
     }
@@ -105,6 +148,12 @@ html_template = '''<!DOCTYPE html>
         .tile-selector { margin-top:10px; }
         .tile-selector label { display:block; margin-bottom:5px; color:#666; font-size:12px; }
         .tile-selector select { width:100%; padding:5px; border:1px solid #ddd; border-radius:4px; font-size:12px; }
+        .mode-button { width:100%; margin-top:10px; padding:8px; border:1px solid #ccd6e0; border-radius:4px; background:#f8fbff; color:#2c5c86; font-size:13px; font-family:"Microsoft YaHei",Arial,sans-serif; cursor:pointer; }
+        .mode-button.active { background:#2c5c86; border-color:#2c5c86; color:white; }
+        .metric-legend { display:none; margin-top:10px; padding-top:10px; border-top:1px solid #eee; }
+        .metric-legend.active { display:block; }
+        .metric-gradient { height:10px; width:140px; margin:6px 0; border-radius:999px; background:linear-gradient(90deg,#2b6cff,#00c2ff,#21c45d,#ffd23f,#ff4d4f); }
+        .metric-scale { display:flex; justify-content:space-between; gap:10px; color:#666; font-size:11px; }
     </style>
 </head>
 <body>
@@ -128,6 +177,8 @@ for date in sorted(all_data.keys()):
 html_template += '''            </select>
         </div>
         <div class="coord-info">📌 已启用坐标纠正（国内APP数据→WGS84）</div>
+        <button id="altitudeToggle" class="mode-button" type="button" onclick="toggleAltitudeMode()">海拔路径：关闭</button>
+        <button id="speedToggle" class="mode-button" type="button" onclick="toggleSpeedMode()">速度路径：关闭</button>
         <div class="tile-selector">
             <label>🗺️ 地图源:</label>
             <select id="tileSelect" onchange="changeTile()">
@@ -145,13 +196,24 @@ html_template += '''            </select>
                 <div class="label">时间段</div>
                 <div class="value" id="timeRange">-</div>
             </div>
+            <div class="info-item">
+                <div class="label">海拔范围</div>
+                <div class="value" id="altitudeRange">-</div>
+            </div>
+            <div class="info-item">
+                <div class="label">速度范围</div>
+                <div class="value" id="speedRange">-</div>
+            </div>
         </div>
     </div>
     <div class="legend">
         <div style="font-weight:bold; margin-bottom:8px;">图例</div>
         <div class="legend-item"><span class="legend-color" style="background:#3388ff;"></span>移动轨迹</div>
-        <div class="legend-item"><span class="legend-dot" style="background:#00cc00;"></span>起点</div>
-        <div class="legend-item"><span class="legend-dot" style="background:#ff3333;"></span>终点</div>
+        <div id="metricLegend" class="metric-legend">
+            <div id="metricLegendTitle" style="font-weight:bold;">可视化路径</div>
+            <div class="metric-gradient"></div>
+            <div class="metric-scale"><span id="metricMinLabel">低</span><span id="metricMaxLabel">高</span></div>
+        </div>
     </div>
     <div class="stats-panel">
         📊 总日期数: ''' + str(len(all_data)) + ''' | 总记录数: ''' + str(sum(d['count'] for d in all_data.values())) + '''
@@ -179,7 +241,9 @@ var allData = null;
 var map = L.map('map').setView([31.23, 121.47], 12);
 var currentTileLayer = tileLayers.osm.addTo(map);
 var currentLayer = null;
+var metricLayer = null;
 var currentDate = null;
+var activeMetric = null;
 
 function changeTile() {
     var tileType = document.getElementById('tileSelect').value;
@@ -187,11 +251,168 @@ function changeTile() {
     currentTileLayer = tileLayers[tileType].addTo(map);
 }
 
+function formatAltitude(value) {
+    if (value === null || value === undefined || !isFinite(value)) return '-';
+    return value.toFixed(1) + ' m';
+}
+
+function formatSpeed(value) {
+    if (value === null || value === undefined || !isFinite(value)) return '-';
+    return value.toFixed(2) + ' m/s';
+}
+
+function formatMetric(metric, value) {
+    return metric === 'speed' ? formatSpeed(value) : formatAltitude(value);
+}
+
+function metricLabel(metric) {
+    return metric === 'speed' ? '速度路径' : '海拔路径';
+}
+
+function metricValues(data, metric) {
+    if (metric === 'speed') {
+        return { values: data.speeds, min: data.speed_min, max: data.speed_max };
+    }
+    return { values: data.elevations, min: data.altitude_min, max: data.altitude_max };
+}
+
+var gradientStops = [
+    { ratio: 0.0, color: [43, 108, 255] },
+    { ratio: 0.25, color: [0, 194, 255] },
+    { ratio: 0.5, color: [33, 196, 93] },
+    { ratio: 0.75, color: [255, 210, 63] },
+    { ratio: 1.0, color: [255, 77, 79] }
+];
+
+function interpolateColor(startColor, endColor, ratio) {
+    var r = Math.round(startColor[0] + (endColor[0] - startColor[0]) * ratio);
+    var g = Math.round(startColor[1] + (endColor[1] - startColor[1]) * ratio);
+    var b = Math.round(startColor[2] + (endColor[2] - startColor[2]) * ratio);
+    return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
+
+function colorForMetric(value, minValue, maxValue) {
+    if (value === null || value === undefined || !isFinite(value)) return '#999999';
+    if (!isFinite(minValue) || !isFinite(maxValue) || minValue === maxValue) return 'rgb(33,196,93)';
+    var ratio = Math.max(0, Math.min(1, (value - minValue) / (maxValue - minValue)));
+    for (var i = 0; i < gradientStops.length - 1; i++) {
+        var left = gradientStops[i];
+        var right = gradientStops[i + 1];
+        if (ratio >= left.ratio && ratio <= right.ratio) {
+            var localRatio = (ratio - left.ratio) / (right.ratio - left.ratio);
+            return interpolateColor(left.color, right.color, localRatio);
+        }
+    }
+    return interpolateColor(gradientStops[gradientStops.length - 1].color, gradientStops[gradientStops.length - 1].color, 0);
+}
+
+function clearMetricLayer() {
+    if (metricLayer) {
+        map.removeLayer(metricLayer);
+        metricLayer = null;
+    }
+}
+
+function drawMetricLayer(data, correctedPoints) {
+    clearMetricLayer();
+    if (!activeMetric || !data) return;
+
+    var metric = metricValues(data, activeMetric);
+    if (!metric.values || metric.min === null || metric.max === null) return;
+
+    metricLayer = L.layerGroup().addTo(map);
+    var stepsPerSegment = 8;
+    for (var i = 0; i < correctedPoints.length - 1; i++) {
+        var startValue = metric.values[i];
+        var endValue = metric.values[i + 1];
+        if (startValue === null || startValue === undefined || !isFinite(startValue)) continue;
+        if (endValue === null || endValue === undefined || !isFinite(endValue)) continue;
+        var startPoint = correctedPoints[i];
+        var endPoint = correctedPoints[i + 1];
+        for (var step = 0; step < stepsPerSegment; step++) {
+            var t1 = step / stepsPerSegment;
+            var t2 = (step + 1) / stepsPerSegment;
+            var midT = (t1 + t2) / 2;
+            var segmentValue = startValue + (endValue - startValue) * midT;
+            var color = colorForMetric(segmentValue, metric.min, metric.max);
+            var segmentStart = [
+                startPoint[0] + (endPoint[0] - startPoint[0]) * t1,
+                startPoint[1] + (endPoint[1] - startPoint[1]) * t1
+            ];
+            var segmentEnd = [
+                startPoint[0] + (endPoint[0] - startPoint[0]) * t2,
+                startPoint[1] + (endPoint[1] - startPoint[1]) * t2
+            ];
+            L.polyline([segmentStart, segmentEnd], {
+                color: color,
+                weight: 7,
+                opacity: 0.95,
+                lineCap: 'round',
+                lineJoin: 'round'
+            }).addTo(metricLayer)
+              .bindPopup('<b>' + metricLabel(activeMetric) + '</b><br>起点: ' + formatMetric(activeMetric, startValue) + '<br>终点: ' + formatMetric(activeMetric, endValue));
+        }
+    }
+}
+
+function updateMetricUi(data) {
+    var altitudeButton = document.getElementById('altitudeToggle');
+    var speedButton = document.getElementById('speedToggle');
+    var legend = document.getElementById('metricLegend');
+    altitudeButton.textContent = activeMetric === 'altitude' ? '海拔路径：开启' : '海拔路径：关闭';
+    speedButton.textContent = activeMetric === 'speed' ? '速度路径：开启' : '速度路径：关闭';
+    altitudeButton.classList.toggle('active', activeMetric === 'altitude');
+    speedButton.classList.toggle('active', activeMetric === 'speed');
+    legend.classList.toggle('active', activeMetric !== null);
+
+    var minAltitude = data ? data.altitude_min : null;
+    var maxAltitude = data ? data.altitude_max : null;
+    var minSpeed = data ? data.speed_min : null;
+    var maxSpeed = data ? data.speed_max : null;
+    document.getElementById('altitudeRange').textContent =
+        minAltitude === null || maxAltitude === null ? '-' : formatAltitude(minAltitude) + ' - ' + formatAltitude(maxAltitude);
+    document.getElementById('speedRange').textContent =
+        minSpeed === null || maxSpeed === null ? '-' : formatSpeed(minSpeed) + ' - ' + formatSpeed(maxSpeed);
+
+    if (activeMetric) {
+        var metric = metricValues(data, activeMetric);
+        document.getElementById('metricLegendTitle').textContent = metricLabel(activeMetric);
+        document.getElementById('metricMinLabel').textContent = metric.min === null ? '低' : formatMetric(activeMetric, metric.min);
+        document.getElementById('metricMaxLabel').textContent = metric.max === null ? '高' : formatMetric(activeMetric, metric.max);
+    } else {
+        document.getElementById('metricLegendTitle').textContent = '可视化路径';
+        document.getElementById('metricMinLabel').textContent = '低';
+        document.getElementById('metricMaxLabel').textContent = '高';
+    }
+}
+
+function toggleAltitudeMode() {
+    activeMetric = activeMetric === 'altitude' ? null : 'altitude';
+    applyMetricMode();
+}
+
+function toggleSpeedMode() {
+    activeMetric = activeMetric === 'speed' ? null : 'speed';
+    applyMetricMode();
+}
+
+function applyMetricMode() {
+    if (!allData || !currentDate) return;
+    var data = allData[currentDate];
+    updateMetricUi(data);
+    if (!activeMetric) {
+        clearMetricLayer();
+        return;
+    }
+    drawMetricLayer(data, correctTrackPoints(data.points));
+}
+
 function loadTrack(date) {
     if (!allData) return;
     
     currentDate = date;
     if (currentLayer) { map.removeLayer(currentLayer); }
+    clearMetricLayer();
     var data = allData[date];
     if (!data || data.points.length === 0) { alert('该日期没有轨迹数据！'); return; }
     var points = correctTrackPoints(data.points);
@@ -208,6 +429,8 @@ function loadTrack(date) {
     map.fitBounds(polyline.getBounds(), { padding:[50, 50] });
     document.getElementById('pointCount').textContent = data.count + ' 个点';
     document.getElementById('timeRange').textContent = data.start_time + ' - ' + data.end_time;
+    updateMetricUi(data);
+    drawMetricLayer(data, points);
 }
 
 function changeDate() {
