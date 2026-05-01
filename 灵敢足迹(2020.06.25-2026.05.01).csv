@@ -1,4 +1,4 @@
-geoTime,latitude,longitude,altitude,course,horizontalAccuracy,verticalAccuracy,speed,status,activity,network,networkName,appStatus,locateType,dayTime,deviceId
+﻿geoTime,latitude,longitude,altitude,course,horizontalAccuracy,verticalAccuracy,speed,status,activity,network,networkName,appStatus,locateType,dayTime,deviceId
 1727834853441,30.520343,120.523744,4.9E-324,0.0,653.0,0.0,0.0,0,0,0,,0,0,1727798400,B338CF2FCFE26D5D85BCFEDFBCBD2264
 1598867901000,31.1769282979243,121.59800932763072,0.0,0.0,0.0,0.0,0.0,0,0,0,,0,1,1598803200,B338CF2FCFE26D5D85BCFEDFBCBD2264
 1598879961000,31.177808223351054,121.5969951289247,80.99,0.0,0.0,0.0,0.0,0,0,0,,0,1,1598803200,B338CF2FCFE26D5D85BCFEDFBCBD2264
