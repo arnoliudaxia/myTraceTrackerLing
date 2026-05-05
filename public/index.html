@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>灵敢足迹 - 地理路径可视化</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel=stylesheet href=styles.css>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="control-panel">
+        <h2>📍 灵敢足迹可视化</h2>
+        <div class="label-selector">
+            <label>🏷️ 标签:</label>
+            <div id="labelGrid" class="label-grid"></div>
+            <div class="label-editor">
+                <input id="labelInput" type="text" placeholder="给选中路径打标签">
+                <button type="button" onclick="applyLabelToSelectedSegments()">应用</button>
+                <button type="button" onclick="savePathLabels()">保存</button>
+            </div>
+        </div>
+        <div id="labelModeHint" class="mode-hint">标签模式：日期选择暂时无效</div>
+        <div id="dateSelectorPanel" class="date-selector">
+            <label>📅 选择日期:</label>
+            <select id="dateSelect" onchange="changeDate()">
+        <option value="2020-08-31">2020-08-31 (16个点, 17:58:21-21:46:33)</option>
+        <option value="2021-07-23">2021-07-23 (11个点, 15:33:40-16:49:16)</option>
+        <option value="2023-01-23">2023-01-23 (25个点, 13:06:07-13:49:41)</option>
+        <option value="2023-02-28">2023-02-28 (20个点, 18:14:04-19:21:08)</option>
+        <option value="2023-04-26">2023-04-26 (28个点, 18:42:11-20:08:34)</option>
+        <option value="2023-07-29">2023-07-29 (27个点, 11:49:21-20:11:22)</option>
+        <option value="2023-07-30">2023-07-30 (13个点, 12:44:14-18:49:25)</option>
+        <option value="2023-10-21">2023-10-21 (82个点, 10:45:28-11:44:01)</option>
+        <option value="2023-11-16">2023-11-16 (14个点, 19:02:18-19:22:59)</option>
+        <option value="2023-11-23">2023-11-23 (66个点, 10:19:18-11:53:19)</option>
+        <option value="2023-12-07">2023-12-07 (26个点, 15:53:16-16:03:19)</option>
+        <option value="2023-12-15">2023-12-15 (59个点, 02:02:26-18:46:36)</option>
+        <option value="2023-12-20">2023-12-20 (14个点, 00:26:52-22:27:08)</option>
+        <option value="2023-12-25">2023-12-25 (36个点, 20:21:28-23:39:08)</option>
+        <option value="2023-12-28">2023-12-28 (23个点, 16:11:21-18:46:01)</option>
+        <option value="2024-02-13">2024-02-13 (49个点, 15:20:33-15:21:22)</option>
+        <option value="2024-03-15">2024-03-15 (14个点, 22:35:15-22:37:27)</option>
+        <option value="2024-03-17">2024-03-17 (27个点, 14:02:23-17:07:55)</option>
+        <option value="2024-03-31">2024-03-31 (18个点, 12:58:21-22:02:26)</option>
+        <option value="2024-04-29">2024-04-29 (58个点, 21:23:21-23:01:03)</option>
+        <option value="2024-05-03">2024-05-03 (87个点, 09:12:21-20:15:49)</option>
+        <option value="2024-05-04">2024-05-04 (24个点, 11:00:31-15:18:59)</option>
+        <option value="2024-05-10">2024-05-10 (138个点, 13:21:16-15:12:45)</option>
+        <option value="2024-05-31">2024-05-31 (31个点, 15:40:10-19:26:52)</option>
+        <option value="2024-06-05">2024-06-05 (296个点, 14:04:56-17:43:23)</option>
+        <option value="2024-06-06">2024-06-06 (212个点, 10:58:28-19:44:34)</option>
+        <option value="2024-06-07">2024-06-07 (18个点, 16:39:04-18:21:28)</option>
+        <option value="2024-06-08">2024-06-08 (12个点, 11:46:55-23:05:51)</option>
+        <option value="2024-06-09">2024-06-09 (27个点, 00:15:25-12:33:51)</option>
+        <option value="2024-06-26">2024-06-26 (40个点, 10:51:14-22:05:24)</option>
+        <option value="2024-06-27">2024-06-27 (573个点, 11:36:59-01:16:45)</option>
+        <option value="2024-06-28">2024-06-28 (287个点, 07:54:01-23:58:30)</option>
+        <option value="2024-07-04">2024-07-04 (12个点, 16:28:42-21:09:33)</option>
+        <option value="2024-10-02">2024-10-02 (321个点, 10:07:33-21:33:34)</option>
+        <option value="2024-10-03">2024-10-03 (384个点, 08:32:17-03:58:17)</option>
+        <option value="2024-10-04">2024-10-04 (614个点, 06:45:23-19:36:32)</option>
+        <option value="2024-10-05">2024-10-05 (178个点, 08:39:12-19:51:24)</option>
+        <option value="2024-10-06">2024-10-06 (476个点, 07:42:25-15:23:22)</option>
+        <option value="2024-10-30">2024-10-30 (12个点, 14:55:54-19:42:18)</option>
+        <option value="2025-03-01">2025-03-01 (24个点, 10:08:29-15:15:25)</option>
+        <option value="2025-03-08">2025-03-08 (19个点, 00:55:30-17:36:06)</option>
+        <option value="2025-03-12">2025-03-12 (20个点, 00:50:16-20:18:05)</option>
+        <option value="2025-03-15">2025-03-15 (12个点, 15:31:23-16:42:27)</option>
+        <option value="2025-03-18">2025-03-18 (46个点, 15:04:57-21:05:36)</option>
+        <option value="2025-03-19">2025-03-19 (51个点, 09:04:40-11:29:29)</option>
+        <option value="2025-03-22">2025-03-22 (14个点, 13:31:14-19:12:12)</option>
+        <option value="2025-04-10">2025-04-10 (13个点, 01:45:58-23:54:28)</option>
+        <option value="2025-04-13">2025-04-13 (27个点, 12:46:26-17:13:52)</option>
+        <option value="2025-04-26">2025-04-26 (32个点, 17:15:34-23:13:07)</option>
+        <option value="2025-05-08">2025-05-08 (146个点, 13:22:38-15:45:02)</option>
+        <option value="2025-05-22">2025-05-22 (16个点, 03:57:51-20:45:28)</option>
+        <option value="2025-08-01">2025-08-01 (50个点, 13:29:34-22:46:44)</option>
+        <option value="2025-11-30">2025-11-30 (12个点, 00:01:00-21:16:02)</option>
+        <option value="2025-12-01">2025-12-01 (22个点, 11:43:58-20:02:35)</option>
+        <option value="2026-03-09">2026-03-09 (15个点, 18:05:39-21:33:08)</option>
+        <option value="2026-03-14">2026-03-14 (315个点, 11:12:08-18:22:56)</option>
+        <option value="2026-04-02">2026-04-02 (334个点, 14:35:48-17:41:13)</option>
+        <option value="2026-04-16">2026-04-16 (47个点, 14:35:28-16:35:45)</option>
+        <option value="2026-04-23">2026-04-23 (81个点, 16:40:57-23:26:32)</option>
+        <option value="2026-04-24">2026-04-24 (179个点, 01:09:05-21:36:32)</option>
+        <option value="2026-05-01" selected>2026-05-01 (212个点, 17:29:27-18:08:32)</option>
+            </select>
+        </div>
+        <div class="coord-info">📌 已启用坐标纠正（国内APP数据→WGS84）</div>
+        <button id="altitudeToggle" class="mode-button" type="button" onclick="toggleAltitudeMode()">海拔路径：关闭</button>
+        <button id="speedToggle" class="mode-button" type="button" onclick="toggleSpeedMode()">速度路径：关闭</button>
+        <button id="dataPointToggle" class="mode-button point-toggle" type="button" onclick="toggleDataPoints()">数据点：关闭</button>
+        <div class="segment-selector">
+            <label>🧭 路径段:</label>
+            <div id="segmentGrid" class="segment-grid"></div>
+        </div>
+        <div class="tile-selector">
+            <label>🗺️ 地图源:</label>
+            <select id="tileSelect" onchange="changeTile()">
+                <option value="osm">OpenStreetMap</option>
+                <option value="cartodb">CartoDB 亮色</option>
+                <option value="cartodb_dark">CartoDB 暗色</option>
+            </select>
+        </div>
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="label">轨迹点数</div>
+                <div class="value" id="pointCount">-</div>
+            </div>
+            <div class="info-item">
+                <div class="label">时间段</div>
+                <div class="value" id="timeRange">-</div>
+            </div>
+            <div class="info-item">
+                <div class="label">海拔范围</div>
+                <div class="value" id="altitudeRange">-</div>
+            </div>
+            <div class="info-item">
+                <div class="label">速度范围</div>
+                <div class="value" id="speedRange">-</div>
+            </div>
+            <div class="info-item">
+                <div class="label">路径段数</div>
+                <div class="value" id="segmentCount">-</div>
+            </div>
+        </div>
+    </div>
+    <div class="legend">
+        <div style="font-weight:bold; margin-bottom:8px;">图例</div>
+        <div class="legend-item"><span class="legend-color" style="background:#3388ff;"></span>移动轨迹</div>
+        <div id="metricLegend" class="metric-legend">
+            <div id="metricLegendTitle" style="font-weight:bold;">可视化路径</div>
+            <div class="metric-gradient"></div>
+            <div class="metric-scale"><span id="metricMinLabel">低</span><span id="metricMaxLabel">高</span></div>
+        </div>
+    </div>
+    <div class="stats-panel">
+        📊 总日期数: 61 | 总记录数: 6055
+    </div>
+    <script src=app.js></script>
+</body>
+</html>

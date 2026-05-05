@@ -32,12 +32,18 @@
 
 ### 可视化文件
 
-- `灵敢足迹_轨迹可视化.html` - 主可视化页面（使用 Leaflet.js）
+- `public/index.html` - Node 版本主页面
+- `public/styles.css` - 页面样式
+- `public/app.js` - 前端交互逻辑
+- `灵敢足迹_轨迹可视化.html` - 旧版单文件页面（保留）
 
 ### 脚本文件
 
-- `filter_csv_days.py` - 按每天数据点数量清洗 CSV 的 Python 脚本，保留原始 CSV 行格式
-- `generate_map_working.py` - 生成可视化页面的 Python 脚本
+- `server.mjs` - Node.js 本地服务
+- `scripts/filter-csv-days.mjs` - 按每天数据点数量清洗 CSV 的 Node 脚本
+- `scripts/generate-data.mjs` - 从 CSV 生成 `all_dates_points.json` 的 Node 脚本
+- `filter_csv_days.py` / `generate_map_working.py` - 旧版 Python 脚本（保留）
+- `package.json` - Node 项目入口和 npm scripts
 
 ## 🚀 使用方法
 
@@ -55,7 +61,7 @@
 如需先独立清洗 CSV，可运行：
 
 ```bash
-python filter_csv_days.py "灵敢足迹(2020.06.25-2026.05.01).csv" --in-place
+npm run filter -- "灵敢足迹(2020.06.25-2026.05.01).csv" --in-place
 ```
 
 清洗规则：按 `dayTime` 分组，如果某一天的数据点数量不超过 10 个，则删除这一天的全部记录。脚本只复制保留下来的原始行文本，不会重新格式化 CSV 字段、数字精度或引号。
@@ -63,28 +69,36 @@ python filter_csv_days.py "灵敢足迹(2020.06.25-2026.05.01).csv" --in-place
 如果不想覆盖原文件，可以输出到新文件：
 
 ```bash
-python filter_csv_days.py "灵敢足迹(2020.06.25-2026.05.01).csv" -o "灵敢足迹_filtered.csv"
+npm run filter -- "灵敢足迹(2020.06.25-2026.05.01).csv" -o "灵敢足迹_filtered.csv"
 ```
 
-### 3. 生成可视化页面
+### 3. 生成数据
 
-运行 Python 脚本生成可视化页面：
+运行 Node 脚本生成数据：
 
 ```bash
-python generate_map_working.py
+npm run generate
 ```
 
 脚本会：
 
 - 直接读取当前 CSV 数据；如果没有 `date` 字段，会优先根据 `dayTime` 自动计算日期
 - 生成 `all_dates_points.json` 数据文件
-- 生成 `灵敢足迹_轨迹可视化.html` 可视化页面
+- 确保 `path_labels.json` 存在
 
-### 4. 查看可视化结果
+### 4. 启动 Node 服务
 
-在浏览器中打开 `灵敢足迹_轨迹可视化.html` 文件即可查看可视化结果。
+```bash
+npm start
+```
 
-**注意**：由于使用了外部 JSON 数据文件，建议通过 Web 服务器访问，或直接双击 HTML 文件（现代浏览器通常支持本地 fetch）。
+然后在浏览器中打开：
+
+```text
+http://localhost:3000
+```
+
+Node 服务会托管 `public/` 前端文件，并提供 `all_dates_points.json`、`path_labels.json` 和标签保存接口。
 
 ### 5. 操作说明
 
@@ -150,10 +164,9 @@ correctedLng = lng - dLng;
 
 ### 依赖库
 
-- **Python**：
-  - `pandas` - 数据处理
-  - `json` - JSON 文件读写
-  - `datetime` - 时间格式转换
+- **Node.js**：
+  - 使用 Node.js 18+ 内置模块处理 CSV、JSON 和本地 HTTP 服务
+  - 无需安装第三方 npm 依赖
 
 - **前端**：
   - [Leaflet.js](https://leafletjs.com/) v1.9.4 - 地图可视化库
@@ -231,6 +244,14 @@ correctedLng = lng - dLng;
 **A**: 编辑 `灵敢足迹_轨迹可视化.html` 文件中的 `correctCoord()` 函数。
 
 ## 📝 更新日志
+
+### v2.0 (2026-05-05)
+
+- ✅ 迁移到 Node.js 项目结构
+- ✅ 拆分前端为 `public/index.html`、`public/styles.css`、`public/app.js`
+- ✅ 新增 `scripts/generate-data.mjs`，替代 Python 数据生成流程
+- ✅ 新增 `scripts/filter-csv-days.mjs`，替代 Python CSV 清洗流程
+- ✅ 新增 `server.mjs`，提供本地服务和标签保存 API
 
 ### v1.0 (2026-05-02)
 
