@@ -1,12 +1,25 @@
 * { margin:0; padding:0; box-sizing:border-box; }
+        html, body { margin:0; height:100%; }
         body { font-family:"Microsoft YaHei",Arial,sans-serif; }
         #map { width:100%; height:100vh; }
-        .control-panel { position:fixed; top:10px; left:50px; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 15px rgba(0,0,0,0.3); z-index:1000; min-width:340px; }
+        .control-panel { position:fixed; top:10px; left:50px; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 15px rgba(0,0,0,0.3); z-index:1000; min-width:340px; max-height:calc(100vh - 20px); overflow-y:auto; }
         .control-panel h2 { margin:0 0 12px 0; color:#333; font-size:18px; }
         .date-selector { margin-bottom:12px; }
         .date-selector.disabled { opacity:0.45; pointer-events:none; }
         .date-selector label { display:block; margin-bottom:5px; color:#666; font-size:14px; font-weight:bold; }
-        .date-selector select { width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; font-size:13px; font-family:"Microsoft YaHei",Arial,sans-serif; cursor:pointer; }
+        .date-selector select { display:none; }
+        .calendar { border:1px solid #e5e7eb; border-radius:6px; padding:8px; background:#fff; }
+        .calendar-header { display:grid; grid-template-columns:28px 1fr 28px; align-items:center; gap:6px; margin-bottom:6px; }
+        .calendar-title { text-align:center; color:#333; font-size:13px; font-weight:bold; }
+        .calendar-nav { width:28px; height:26px; border:1px solid #d8dee7; border-radius:4px; background:#f8fbff; color:#2c5c86; font-size:18px; line-height:1; cursor:pointer; }
+        .calendar-nav:hover { border-color:#3388ff; color:#2166c2; }
+        .calendar-weekdays, .calendar-grid { display:grid; grid-template-columns:repeat(7, 1fr); gap:4px; }
+        .calendar-weekdays { margin-bottom:4px; color:#888; font-size:11px; text-align:center; }
+        .calendar-day { min-width:0; aspect-ratio:1 / 1; border:1px solid transparent; border-radius:4px; background:#f5f5f5; color:#aaa; font-size:12px; font-family:"Microsoft YaHei",Arial,sans-serif; cursor:default; }
+        .calendar-day.available { background:#f8fbff; border-color:#d8e8ff; color:#2c5c86; cursor:pointer; font-weight:bold; }
+        .calendar-day.available:hover { border-color:#3388ff; background:#eef6ff; }
+        .calendar-day.active { background:#3388ff; border-color:#3388ff; color:white; }
+        .calendar-day.outside { opacity:0.35; }
         .coord-info { font-size:12px; color:#999; margin-top:8px; line-height:1.5; }
         .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
         .info-item { padding:8px; background:#f5f5f5; border-radius:4px; font-size:13px; }
@@ -36,6 +49,12 @@
         .label-editor { display:grid; grid-template-columns:1fr auto auto; gap:6px; margin-top:8px; }
         .label-editor input { min-width:0; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:12px; }
         .label-editor button { padding:6px 8px; border:1px solid #ccd6e0; border-radius:4px; background:#f8fbff; color:#2c5c86; font-size:12px; cursor:pointer; }
+        .quick-labels { margin-top:8px; }
+        .quick-label-title { color:#666; font-size:12px; margin-bottom:5px; }
+        .quick-label-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; max-height:80px; overflow-y:auto; padding-right:2px; }
+        .quick-label-button { padding:6px 4px; border:1px solid #ddd; border-radius:4px; background:#fff; color:#555; font-size:12px; font-family:"Microsoft YaHei",Arial,sans-serif; cursor:pointer; }
+        .quick-label-button:hover { border-color:#7c3aed; color:#6d28d9; }
+        .quick-label-empty { color:#999; font-size:12px; grid-column:1 / -1; }
         .mode-hint { display:none; margin-bottom:8px; padding:6px 8px; border-radius:4px; background:#f5efff; color:#6d28d9; font-size:12px; }
         .mode-hint.active { display:block; }
         .mode-button { width:100%; margin-top:10px; padding:8px; border:1px solid #ccd6e0; border-radius:4px; background:#f8fbff; color:#2c5c86; font-size:13px; font-family:"Microsoft YaHei",Arial,sans-serif; cursor:pointer; }

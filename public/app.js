@@ -32,11 +32,36 @@ var currentCorrectedPoints = [];
 var currentSegments = [];
 var selectedSegments = 'all';
 var segmentGapThresholdMs = 60 * 60 * 1000;
+var pathLabelsSaveTimer = null;
+var availableDates = [];
+var availableDateSet = new Set();
+var calendarViewYear = null;
+var calendarViewMonth = null;
+var mapRefreshTimer = null;
 
 function changeTile() {
     var tileType = document.getElementById('tileSelect').value;
     map.removeLayer(currentTileLayer);
     currentTileLayer = tileLayers[tileType].addTo(map);
+    scheduleMapRefresh();
+}
+
+function redrawLeafletLayer(layer) {
+    if (!layer || !layer.eachLayer) return;
+    layer.eachLayer(function(item) {
+        if (item.redraw) item.redraw();
+    });
+}
+
+function scheduleMapRefresh() {
+    if (mapRefreshTimer) cancelAnimationFrame(mapRefreshTimer);
+    mapRefreshTimer = requestAnimationFrame(function() {
+        mapRefreshTimer = null;
+        map.invalidateSize({ pan: false });
+        redrawLeafletLayer(currentLayer);
+        redrawLeafletLayer(metricLayer);
+        redrawLeafletLayer(dataPointLayer);
+    });
 }
 
 function pathLabelKey(date, segmentIndex) {
@@ -74,6 +99,33 @@ function populateLabelButtons() {
         button.onclick = function() { toggleLabel(label); };
         grid.appendChild(button);
     });
+
+    populateQuickLabelButtons();
+}
+
+function populateQuickLabelButtons() {
+    var grid = document.getElementById('quickLabelGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    var labels = uniqueLabels();
+    if (labels.length === 0) {
+        var empty = document.createElement('div');
+        empty.className = 'quick-label-empty';
+        empty.textContent = '暂无已有标签';
+        grid.appendChild(empty);
+        return;
+    }
+
+    labels.forEach(function(label) {
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'quick-label-button';
+        button.textContent = label;
+        button.title = '应用标签：' + label;
+        button.onclick = function() { applyExistingLabel(label); };
+        grid.appendChild(button);
+    });
 }
 
 function clearLabelMode() {
@@ -101,7 +153,8 @@ function toggleLabel(label) {
 
 function setDateControlsDisabled(disabled) {
     document.getElementById('dateSelectorPanel').classList.toggle('disabled', disabled);
-    document.getElementById('dateSelect').disabled = disabled;
+    var selector = document.getElementById('dateSelect');
+    if (selector) selector.disabled = disabled;
     document.getElementById('labelModeHint').classList.toggle('active', disabled);
 }
 
@@ -112,26 +165,56 @@ function selectedSegmentIndexesForLabeling() {
     return selectedSegments.slice();
 }
 
+function applyLabelToSegments(label) {
+    var changed = false;
+    selectedSegmentIndexesForLabeling().forEach(function(segmentIndex) {
+        var key = pathLabelKey(currentDate, segmentIndex);
+        if (pathLabels[key] !== label) {
+            pathLabels[key] = label;
+            changed = true;
+        }
+    });
+    return changed;
+}
+
 function applyLabelToSelectedSegments() {
     if (isLabelMode()) {
-        alert('请先切回日期模式，再给路径打标签。');
         return;
     }
     if (!currentDate || currentSegments.length === 0) return;
     var label = document.getElementById('labelInput').value.trim();
     if (!label) {
-        alert('请输入标签名称。');
+        document.getElementById('labelInput').focus();
         return;
     }
-    selectedSegmentIndexesForLabeling().forEach(function(segmentIndex) {
-        pathLabels[pathLabelKey(currentDate, segmentIndex)] = label;
-    });
+    var changed = applyLabelToSegments(label);
     document.getElementById('labelInput').value = '';
     populateLabelButtons();
     populateSegmentButtons(allData[currentDate]);
+    if (changed) schedulePathLabelsSave();
 }
 
-async function savePathLabels() {
+function applyExistingLabel(label) {
+    if (isLabelMode()) {
+        return;
+    }
+    if (!currentDate || currentSegments.length === 0) return;
+    var changed = applyLabelToSegments(label);
+    populateLabelButtons();
+    populateSegmentButtons(allData[currentDate]);
+    if (changed) schedulePathLabelsSave();
+}
+
+function schedulePathLabelsSave() {
+    if (pathLabelsSaveTimer) clearTimeout(pathLabelsSaveTimer);
+    pathLabelsSaveTimer = setTimeout(function() {
+        pathLabelsSaveTimer = null;
+        persistPathLabels({ allowFallback: false });
+    }, 300);
+}
+
+async function persistPathLabels(options) {
+    var allowFallback = options && options.allowFallback;
     var content = JSON.stringify(pathLabels, null, 2);
     try {
         var response = await fetch('/api/path-labels', {
@@ -140,11 +223,15 @@ async function savePathLabels() {
             body: content
         });
         if (response.ok) {
-            alert('标签已保存到 path_labels.json。');
-            return;
+            return true;
         }
     } catch (error) {
         // Fall back to browser-side save below when the Node API is unavailable.
+    }
+
+    if (!allowFallback) {
+        console.warn('Unable to auto-save path_labels.json. Please make sure the Node server is running.');
+        return false;
     }
 
     if (window.showSaveFilePicker) {
@@ -156,10 +243,9 @@ async function savePathLabels() {
             var writable = await handle.createWritable();
             await writable.write(content);
             await writable.close();
-            alert('标签已保存。');
-            return;
+            return true;
         } catch (error) {
-            if (error && error.name === 'AbortError') return;
+            if (error && error.name === 'AbortError') return false;
         }
     }
     var blob = new Blob([content], { type: 'application/json;charset=utf-8' });
@@ -169,6 +255,11 @@ async function savePathLabels() {
     link.download = 'path_labels.json';
     link.click();
     URL.revokeObjectURL(url);
+    return true;
+}
+
+async function savePathLabels() {
+    return persistPathLabels({ allowFallback: true });
 }
 
 function formatAltitude(value) {
@@ -183,6 +274,77 @@ function formatSpeed(value) {
 
 function formatMetric(metric, value) {
     return metric === 'speed' ? formatSpeed(value) : formatAltitude(value);
+}
+
+function parseDateKey(dateKey) {
+    var parts = String(dateKey).split('-').map(function(value) { return parseInt(value, 10); });
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
+function formatDateKey(year, month, day) {
+    return [
+        String(year),
+        String(month + 1).padStart(2, '0'),
+        String(day).padStart(2, '0')
+    ].join('-');
+}
+
+function updateHiddenDateSelect(date) {
+    var selector = document.getElementById('dateSelect');
+    if (selector) selector.value = date;
+}
+
+function renderDateCalendar() {
+    var grid = document.getElementById('calendarGrid');
+    var title = document.getElementById('calendarTitle');
+    if (!grid || !title || calendarViewYear === null || calendarViewMonth === null) return;
+
+    grid.innerHTML = '';
+    title.textContent = calendarViewYear + '年' + String(calendarViewMonth + 1).padStart(2, '0') + '月';
+
+    var firstDay = new Date(calendarViewYear, calendarViewMonth, 1);
+    var daysInMonth = new Date(calendarViewYear, calendarViewMonth + 1, 0).getDate();
+    var leadingDays = (firstDay.getDay() + 6) % 7;
+    var totalCells = Math.ceil((leadingDays + daysInMonth) / 7) * 7;
+    var startDate = new Date(calendarViewYear, calendarViewMonth, 1 - leadingDays);
+
+    for (var i = 0; i < totalCells; i++) {
+        var cellDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + i);
+        var dateKey = formatDateKey(cellDate.getFullYear(), cellDate.getMonth(), cellDate.getDate());
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'calendar-day';
+        button.textContent = cellDate.getDate();
+        if (cellDate.getMonth() !== calendarViewMonth) button.className += ' outside';
+        if (availableDateSet.has(dateKey)) {
+            button.className += ' available';
+            button.title = dateKey + ' · ' + allData[dateKey].count + ' 个点';
+            button.onclick = function(selectedDate) {
+                return function() { selectCalendarDate(selectedDate); };
+            }(dateKey);
+        } else {
+            button.disabled = true;
+        }
+        if (dateKey === currentDate) button.className += ' active';
+        grid.appendChild(button);
+    }
+}
+
+function selectCalendarDate(date) {
+    if (!availableDateSet.has(date) || isLabelMode()) return;
+    var parsed = parseDateKey(date);
+    calendarViewYear = parsed.getFullYear();
+    calendarViewMonth = parsed.getMonth();
+    updateHiddenDateSelect(date);
+    loadTrack(date);
+}
+
+function changeCalendarMonth(offset) {
+    if (calendarViewYear === null || calendarViewMonth === null) return;
+    var next = new Date(calendarViewYear, calendarViewMonth + offset, 1);
+    calendarViewYear = next.getFullYear();
+    calendarViewMonth = next.getMonth();
+    renderDateCalendar();
 }
 
 function metricLabel(metric) {
@@ -609,6 +771,7 @@ function renderLabelMode() {
     if (boundsPoints.length > 0) {
         map.fitBounds(L.latLngBounds(boundsPoints), { padding:[50, 50] });
     }
+    scheduleMapRefresh();
 }
 
 function updateMetricUi(data) {
@@ -697,6 +860,7 @@ function redrawCurrentTrack() {
     drawEndpointMarkers(data, currentCorrectedPoints);
     drawMetricLayer(data, currentCorrectedPoints);
     drawDataPoints(data, currentCorrectedPoints);
+    scheduleMapRefresh();
 }
 
 function toggleSegment(segmentIndex) {
@@ -772,7 +936,9 @@ function loadTrack(date) {
     if (!allData) return;
     
     currentDate = date;
+    updateHiddenDateSelect(date);
     selectedSegments = 'all';
+    renderDateCalendar();
     if (currentLayer) { map.removeLayer(currentLayer); }
     clearMetricLayer();
     clearDataPointLayer();
@@ -788,6 +954,7 @@ function loadTrack(date) {
     map.fitBounds(L.latLngBounds(points), { padding:[50, 50] });
     updateMetricUi(data);
     drawMetricLayer(data, points);
+    scheduleMapRefresh();
 }
 
 function changeDate() {
@@ -799,15 +966,28 @@ function populateDateSelector(data) {
     var selector = document.getElementById('dateSelect');
     var dates = Object.keys(data).sort();
     var latestDate = dates[dates.length - 1];
-    selector.innerHTML = '';
-    dates.forEach(function(date) {
-        var item = data[date];
-        var option = document.createElement('option');
-        option.value = date;
-        option.textContent = date + ' (' + item.count + '个点, ' + item.start_time + '-' + item.end_time + ')';
-        option.selected = date === latestDate;
-        selector.appendChild(option);
-    });
+    availableDates = dates;
+    availableDateSet = new Set(dates);
+
+    if (selector) {
+        selector.innerHTML = '';
+        dates.forEach(function(date) {
+            var item = data[date];
+            var option = document.createElement('option');
+            option.value = date;
+            option.textContent = date + ' (' + item.count + '个点, ' + item.start_time + '-' + item.end_time + ')';
+            option.selected = date === latestDate;
+            selector.appendChild(option);
+        });
+    }
+
+    if (latestDate) {
+        var latest = parseDateKey(latestDate);
+        calendarViewYear = latest.getFullYear();
+        calendarViewMonth = latest.getMonth();
+        currentDate = latestDate;
+        renderDateCalendar();
+    }
 }
 
 // 加载JSON数据
@@ -829,3 +1009,5 @@ Promise.all([
     });
 
 L.control.scale({ imperial:false }).addTo(map);
+window.addEventListener('load', scheduleMapRefresh);
+window.addEventListener('resize', scheduleMapRefresh);
