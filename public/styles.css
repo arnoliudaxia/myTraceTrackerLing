@@ -55,6 +55,21 @@
         .quick-label-button { padding:6px 4px; border:1px solid #ddd; border-radius:4px; background:#fff; color:#555; font-size:12px; font-family:"Microsoft YaHei",Arial,sans-serif; cursor:pointer; }
         .quick-label-button:hover { border-color:#7c3aed; color:#6d28d9; }
         .quick-label-empty { color:#999; font-size:12px; grid-column:1 / -1; }
+        .favorite-panel { margin-top:10px; padding-top:10px; border-top:1px solid #eee; }
+        .favorite-panel label { display:block; margin-bottom:5px; color:#666; font-size:12px; font-weight:bold; }
+        .favorite-editor { display:grid; grid-template-columns:1fr auto; gap:6px; align-items:stretch; }
+        .favorite-editor textarea { min-width:0; resize:vertical; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:12px; font-family:"Microsoft YaHei",Arial,sans-serif; line-height:1.35; }
+        .favorite-editor button { padding:6px 8px; border:1px solid #d8dee7; border-radius:4px; background:#fff8e5; color:#8a5a00; font-size:12px; cursor:pointer; }
+        .favorite-list { display:grid; gap:6px; max-height:150px; overflow-y:auto; margin-top:8px; padding-right:2px; }
+        .favorite-item { display:grid; grid-template-columns:1fr auto; gap:6px; align-items:start; padding:7px; border:1px solid #eadcae; border-radius:5px; background:#fffdf5; color:#4b4030; text-align:left; font-family:"Microsoft YaHei",Arial,sans-serif; }
+        .favorite-open { min-width:0; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; font-family:inherit; }
+        .favorite-title { font-size:12px; font-weight:bold; color:#6b4b00; }
+        .favorite-note { margin-top:3px; color:#666; font-size:12px; line-height:1.35; white-space:pre-wrap; word-break:break-word; }
+        .favorite-meta { margin-top:3px; color:#999; font-size:11px; }
+        .favorite-delete { width:24px; height:24px; border:1px solid #eadcae; border-radius:4px; background:white; color:#9a3412; cursor:pointer; }
+        .favorite-empty { color:#999; font-size:12px; padding:4px 0; }
+        .segment-button.favorited { border-color:#f2c94c; background:#fff8e5; color:#7a5200; }
+        .segment-button.active.favorited { background:#f59e0b; border-color:#f59e0b; color:white; }
         .mode-hint { display:none; margin-bottom:8px; padding:6px 8px; border-radius:4px; background:#f5efff; color:#6d28d9; font-size:12px; }
         .mode-hint.active { display:block; }
         .mode-button { width:100%; margin-top:10px; padding:8px; border:1px solid #ccd6e0; border-radius:4px; background:#f8fbff; color:#2c5c86; font-size:13px; font-family:"Microsoft YaHei",Arial,sans-serif; cursor:pointer; }

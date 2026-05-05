@@ -18,6 +18,7 @@ function correctTrackPoints(points){return points.map(function(p){return correct
 
 var allData = null;
 var pathLabels = {};
+var pathFavorites = {};
 var selectedLabels = [];
 var map = L.map('map').setView([31.23, 121.47], 12);
 var currentTileLayer = tileLayers.osm.addTo(map);
@@ -33,6 +34,7 @@ var currentSegments = [];
 var selectedSegments = 'all';
 var segmentGapThresholdMs = 60 * 60 * 1000;
 var pathLabelsSaveTimer = null;
+var pathFavoritesSaveTimer = null;
 var availableDates = [];
 var availableDateSet = new Set();
 var calendarViewYear = null;
@@ -191,6 +193,7 @@ function applyLabelToSelectedSegments() {
     document.getElementById('labelInput').value = '';
     populateLabelButtons();
     populateSegmentButtons(allData[currentDate]);
+    renderFavorites();
     if (changed) schedulePathLabelsSave();
 }
 
@@ -202,6 +205,7 @@ function applyExistingLabel(label) {
     var changed = applyLabelToSegments(label);
     populateLabelButtons();
     populateSegmentButtons(allData[currentDate]);
+    renderFavorites();
     if (changed) schedulePathLabelsSave();
 }
 
@@ -260,6 +264,180 @@ async function persistPathLabels(options) {
 
 async function savePathLabels() {
     return persistPathLabels({ allowFallback: true });
+}
+
+function normalizeFavorite(entry) {
+    if (!entry) return { note: '', createdAt: '' };
+    if (typeof entry === 'string') return { note: entry, createdAt: '' };
+    return {
+        note: String(entry.note || ''),
+        createdAt: String(entry.createdAt || '')
+    };
+}
+
+function favoriteTitle(date, segmentIndex) {
+    var data = allData ? allData[date] : null;
+    var label = pathLabels[pathLabelKey(date, segmentIndex)];
+    if (!data) return date + ' 路径 ' + (segmentIndex + 1);
+    var segment = buildSegments(data)[segmentIndex];
+    var base = date + ' 路径 ' + (segmentIndex + 1);
+    return label ? base + ' · ' + label : base;
+}
+
+function favoriteMeta(date, segmentIndex) {
+    var data = allData ? allData[date] : null;
+    if (!data) return '';
+    var segment = buildSegments(data)[segmentIndex];
+    if (!segment) return '';
+    var count = segment.end - segment.start + 1;
+    var startTime = data.times && data.times[segment.start] ? data.times[segment.start] : '';
+    var endTime = data.times && data.times[segment.end] ? data.times[segment.end] : '';
+    return count + ' 个点 · ' + startTime + ' - ' + endTime;
+}
+
+function favoriteKeys() {
+    return Object.keys(pathFavorites).sort(function(a, b) {
+        var favA = normalizeFavorite(pathFavorites[a]);
+        var favB = normalizeFavorite(pathFavorites[b]);
+        return (favB.createdAt || b).localeCompare(favA.createdAt || a);
+    });
+}
+
+function renderFavorites() {
+    var list = document.getElementById('favoriteList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    var keys = favoriteKeys();
+    if (keys.length === 0) {
+        var empty = document.createElement('div');
+        empty.className = 'favorite-empty';
+        empty.textContent = '暂无收藏路径';
+        list.appendChild(empty);
+        return;
+    }
+
+    keys.forEach(function(key) {
+        var parts = key.split('#');
+        var date = parts[0];
+        var segmentIndex = parseInt(parts[1], 10);
+        var favorite = normalizeFavorite(pathFavorites[key]);
+
+        var item = document.createElement('div');
+        item.className = 'favorite-item';
+
+        var openButton = document.createElement('button');
+        openButton.type = 'button';
+        openButton.className = 'favorite-open';
+        openButton.onclick = function() { openFavoritePath(key); };
+
+        var title = document.createElement('div');
+        title.className = 'favorite-title';
+        title.textContent = favoriteTitle(date, segmentIndex);
+        openButton.appendChild(title);
+
+        var note = document.createElement('div');
+        note.className = 'favorite-note';
+        note.textContent = favorite.note || '无备注';
+        openButton.appendChild(note);
+
+        var meta = document.createElement('div');
+        meta.className = 'favorite-meta';
+        meta.textContent = favoriteMeta(date, segmentIndex);
+        openButton.appendChild(meta);
+
+        var deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'favorite-delete';
+        deleteButton.title = '取消收藏';
+        deleteButton.textContent = '×';
+        deleteButton.onclick = function(event) {
+            event.stopPropagation();
+            delete pathFavorites[key];
+            renderFavorites();
+            if (currentDate === date) populateSegmentButtons(allData[currentDate]);
+            schedulePathFavoritesSave();
+        };
+
+        item.appendChild(openButton);
+        item.appendChild(deleteButton);
+        list.appendChild(item);
+    });
+}
+
+function favoriteSelectedSegments() {
+    if (isLabelMode() || !currentDate || currentSegments.length === 0) return;
+
+    var noteInput = document.getElementById('favoriteNoteInput');
+    var note = noteInput ? noteInput.value.trim() : '';
+    var createdAt = new Date().toISOString();
+    var changed = false;
+
+    selectedSegmentIndices().forEach(function(segmentIndex) {
+        var key = pathLabelKey(currentDate, segmentIndex);
+        var previous = normalizeFavorite(pathFavorites[key]);
+        if (previous.note !== note || !pathFavorites[key]) {
+            pathFavorites[key] = {
+                note: note,
+                createdAt: previous.createdAt || createdAt
+            };
+            changed = true;
+        }
+    });
+
+    if (noteInput) noteInput.value = '';
+    renderFavorites();
+    populateSegmentButtons(allData[currentDate]);
+    if (changed) schedulePathFavoritesSave();
+}
+
+function openFavoritePath(key) {
+    var parts = key.split('#');
+    var date = parts[0];
+    var segmentIndex = parseInt(parts[1], 10);
+    if (!allData || !allData[date] || !isFinite(segmentIndex)) return;
+
+    selectedLabels = [];
+    populateLabelButtons();
+    setDateControlsDisabled(false);
+
+    var parsed = parseDateKey(date);
+    calendarViewYear = parsed.getFullYear();
+    calendarViewMonth = parsed.getMonth();
+    loadTrack(date);
+
+    if (!currentSegments[segmentIndex]) return;
+    selectedSegments = [segmentIndex];
+    redrawCurrentTrack();
+
+    var segment = currentSegments[segmentIndex];
+    var segmentPoints = currentCorrectedPoints.slice(segment.start, segment.end + 1);
+    if (segmentPoints.length > 0) {
+        map.fitBounds(L.latLngBounds(segmentPoints), { padding:[60, 60] });
+    }
+    scheduleMapRefresh();
+}
+
+function schedulePathFavoritesSave() {
+    if (pathFavoritesSaveTimer) clearTimeout(pathFavoritesSaveTimer);
+    pathFavoritesSaveTimer = setTimeout(function() {
+        pathFavoritesSaveTimer = null;
+        persistPathFavorites();
+    }, 300);
+}
+
+async function persistPathFavorites() {
+    try {
+        var response = await fetch('/api/path-favorites', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pathFavorites, null, 2)
+        });
+        return response.ok;
+    } catch (error) {
+        console.warn('Unable to auto-save path_favorites.json. Please make sure the Node server is running.');
+        return false;
+    }
 }
 
 function formatAltitude(value) {
@@ -473,9 +651,13 @@ function populateSegmentButtons(data) {
     currentSegments.forEach(function(segment, index) {
         var button = document.createElement('button');
         button.type = 'button';
-        button.className = 'segment-button' + (isSegmentSelected(index) && selectedSegments !== 'all' ? ' active' : '');
-        var label = pathLabels[pathLabelKey(currentDate, index)];
-        button.textContent = label ? String(index + 1) + ' ' + label : String(index + 1);
+        var key = pathLabelKey(currentDate, index);
+        button.className = 'segment-button'
+            + (isSegmentSelected(index) && selectedSegments !== 'all' ? ' active' : '')
+            + (pathFavorites[key] ? ' favorited' : '');
+        var label = pathLabels[key];
+        var prefix = pathFavorites[key] ? '★ ' : '';
+        button.textContent = prefix + (label ? String(index + 1) + ' ' + label : String(index + 1));
         button.title = segmentLabel(data, segment, index);
         button.onclick = function() { toggleSegment(index); };
         grid.appendChild(button);
@@ -993,14 +1175,17 @@ function populateDateSelector(data) {
 // 加载JSON数据
 Promise.all([
     fetch('all_dates_points.json').then(response => response.json()),
-    fetch('path_labels.json').then(response => response.ok ? response.json() : {}).catch(() => ({}))
+    fetch('path_labels.json').then(response => response.ok ? response.json() : {}).catch(() => ({})),
+    fetch('path_favorites.json').then(response => response.ok ? response.json() : {}).catch(() => ({}))
 ])
-    .then(([data, labels]) => {
+    .then(([data, labels, favorites]) => {
         allData = data;
         pathLabels = labels || {};
+        pathFavorites = favorites || {};
         updateDimOpacityUi();
         populateDateSelector(data);
         populateLabelButtons();
+        renderFavorites();
         loadTrack(document.getElementById('dateSelect').value);
     })
     .catch(error => {

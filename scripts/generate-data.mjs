@@ -9,6 +9,7 @@ const rootDir = path.resolve(__dirname, '..');
 const CSV_FILE = path.join(rootDir, '灵敢足迹(2020.06.25-2026.05.01).csv');
 const JSON_FILE = path.join(rootDir, 'all_dates_points.json');
 const PATH_LABELS_FILE = path.join(rootDir, 'path_labels.json');
+const PATH_FAVORITES_FILE = path.join(rootDir, 'path_favorites.json');
 const TIME_ZONE = 'Asia/Shanghai';
 const PATH_GAP_THRESHOLD_MS = 60 * 60 * 1000;
 
@@ -224,6 +225,9 @@ function generate() {
   if (!fs.existsSync(PATH_LABELS_FILE)) {
     fs.writeFileSync(PATH_LABELS_FILE, '{}\n', 'utf8');
   }
+  if (!fs.existsSync(PATH_FAVORITES_FILE)) {
+    fs.writeFileSync(PATH_FAVORITES_FILE, '{}\n', 'utf8');
+  }
 
   const latestDate = Object.keys(allData).sort().at(-1);
   const totalRecords = Object.values(allData).reduce((sum, day) => sum + day.count, 0);
@@ -232,6 +236,7 @@ function generate() {
   console.log(`最新日期: ${latestDate} (默认选中)`);
   console.log(`数据文件: ${JSON_FILE}`);
   console.log(`标签文件: ${PATH_LABELS_FILE}`);
+  console.log(`收藏文件: ${PATH_FAVORITES_FILE}`);
 }
 
 generate();

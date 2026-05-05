@@ -11,6 +11,7 @@ const publicDir = path.join(rootDir, 'public');
 const dataFiles = new Map([
   ['/all_dates_points.json', path.join(rootDir, 'all_dates_points.json')],
   ['/path_labels.json', path.join(rootDir, 'path_labels.json')],
+  ['/path_favorites.json', path.join(rootDir, 'path_favorites.json')],
 ]);
 
 const mimeTypes = new Map([
@@ -57,6 +58,21 @@ async function handlePathLabelsSave(req, res) {
   }
 }
 
+async function handlePathFavoritesSave(req, res) {
+  try {
+    const body = await readBody(req);
+    const favorites = JSON.parse(body || '{}');
+    if (!favorites || Array.isArray(favorites) || typeof favorites !== 'object') {
+      send(res, 400, JSON.stringify({ error: '收藏数据必须是对象' }), 'application/json; charset=utf-8');
+      return;
+    }
+    fs.writeFileSync(path.join(rootDir, 'path_favorites.json'), `${JSON.stringify(favorites, null, 2)}\n`, 'utf8');
+    send(res, 200, JSON.stringify({ ok: true }), 'application/json; charset=utf-8');
+  } catch (error) {
+    send(res, 400, JSON.stringify({ error: error.message }), 'application/json; charset=utf-8');
+  }
+}
+
 function serveFile(filePath, res) {
   if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
     send(res, 404, 'Not found');
@@ -73,6 +89,11 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'POST' && url.pathname === '/api/path-labels') {
     await handlePathLabelsSave(req, res);
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/path-favorites') {
+    await handlePathFavoritesSave(req, res);
     return;
   }
 

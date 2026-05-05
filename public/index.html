@@ -115,6 +115,14 @@
                 <input id="dimOpacityRange" type="range" min="5" max="80" step="5" value="30" oninput="changeDimOpacity()">
             </div>
         </div>
+        <div class="favorite-panel">
+            <label>⭐ 收藏夹:</label>
+            <div class="favorite-editor">
+                <textarea id="favoriteNoteInput" rows="2" placeholder="为选中路径添加备注"></textarea>
+                <button type="button" onclick="favoriteSelectedSegments()">收藏选中路径</button>
+            </div>
+            <div id="favoriteList" class="favorite-list"></div>
+        </div>
         <div class="tile-selector">
             <label>🗺️ 地图源:</label>
             <select id="tileSelect" onchange="changeTile()">
