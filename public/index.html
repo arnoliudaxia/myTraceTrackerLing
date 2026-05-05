@@ -95,6 +95,10 @@
         <div class="segment-selector">
             <label>🧭 路径段:</label>
             <div id="segmentGrid" class="segment-grid"></div>
+            <div class="dim-opacity-control">
+                <label for="dimOpacityRange">弱化透明度: <span id="dimOpacityValue">30%</span></label>
+                <input id="dimOpacityRange" type="range" min="5" max="80" step="5" value="30" oninput="changeDimOpacity()">
+            </div>
         </div>
         <div class="tile-selector">
             <label>🗺️ 地图源:</label>

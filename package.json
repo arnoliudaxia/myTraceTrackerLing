@@ -1,0 +1,16 @@
+{
+  "name": "linggan-footprints-map",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Node.js version of the Linggan footprints map visualizer.",
+  "scripts": {
+    "filter": "node scripts/filter-csv-days.mjs",
+    "generate": "node scripts/generate-data.mjs",
+    "start": "node server.mjs",
+    "dev": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

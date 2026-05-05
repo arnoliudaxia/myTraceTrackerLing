@@ -27,6 +27,7 @@ var dataPointLayer = null;
 var currentDate = null;
 var activeMetric = null;
 var showDataPoints = false;
+var dimmedSegmentOpacity = 0.3;
 var currentCorrectedPoints = [];
 var currentSegments = [];
 var selectedSegments = 'all';
@@ -213,11 +214,11 @@ function buildSegments(data) {
 }
 
 function segmentOpacity(segmentIndex) {
-    return isSegmentSelected(segmentIndex) ? 0.85 : 0.3;
+    return isSegmentSelected(segmentIndex) ? 0.85 : dimmedSegmentOpacity;
 }
 
 function metricSegmentOpacity(segmentIndex) {
-    return isSegmentSelected(segmentIndex) ? 0.95 : 0.3;
+    return isSegmentSelected(segmentIndex) ? 0.95 : dimmedSegmentOpacity;
 }
 
 function isSegmentSelected(segmentIndex) {
@@ -583,7 +584,7 @@ function renderLabelMode() {
         L.polyline(segmentPoints, {
             color: '#3388ff',
             weight: 5,
-            opacity: activeMetric ? 0.3 : 0.85,
+            opacity: activeMetric ? dimmedSegmentOpacity : 0.85,
             lineCap: 'round',
             lineJoin: 'round'
         }).addTo(currentLayer).bindPopup(ref.date + ' 路径 ' + (ref.segmentIndex + 1));
@@ -722,6 +723,27 @@ function toggleSegment(segmentIndex) {
     redrawCurrentTrack();
 }
 
+function updateDimOpacityUi() {
+    var range = document.getElementById('dimOpacityRange');
+    var value = document.getElementById('dimOpacityValue');
+    if (!range || !value) return;
+    var percent = Math.round(dimmedSegmentOpacity * 100);
+    range.value = String(percent);
+    value.textContent = percent + '%';
+}
+
+function changeDimOpacity() {
+    var range = document.getElementById('dimOpacityRange');
+    if (!range) return;
+    dimmedSegmentOpacity = Number(range.value) / 100;
+    updateDimOpacityUi();
+    if (isLabelMode()) {
+        renderLabelMode();
+    } else {
+        redrawCurrentTrack();
+    }
+}
+
 function drawEndpointMarkers(data, points) {
     if (!currentLayer || !points || points.length === 0) return;
     var markerSegments = selectedSegments === 'all'
@@ -796,6 +818,7 @@ Promise.all([
     .then(([data, labels]) => {
         allData = data;
         pathLabels = labels || {};
+        updateDimOpacityUi();
         populateDateSelector(data);
         populateLabelButtons();
         loadTrack(document.getElementById('dateSelect').value);
