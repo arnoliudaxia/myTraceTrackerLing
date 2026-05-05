@@ -43,7 +43,7 @@
 
 - `server.mjs` - Node.js 本地服务
 - `scripts/filter-csv-days.mjs` - 按每天数据点数量清洗 CSV 的 Node 脚本
-- `scripts/generate-data.mjs` - 从 CSV 生成 `all_dates_points.json` 的 Node 脚本
+- `scripts/generate-data.mjs` - 从命令行传入的 CSV 生成 `all_dates_points.json` 的 Node 脚本
 - `filter_csv_days.py` / `generate_map_working.py` - 旧版 Python 脚本（保留）
 - `package.json` - Node 项目入口和 npm scripts
 
@@ -66,12 +66,18 @@
 npm run filter -- "灵敢足迹(2020.06.25-2026.05.01).csv" --in-place
 ```
 
-清洗规则：按 `dayTime` 分组，如果某一天的数据点数量不超过 10 个，则删除这一天的全部记录。脚本只复制保留下来的原始行文本，不会重新格式化 CSV 字段、数字精度或引号。
+清洗规则：按 `dayTime` 分组，如果某一天的数据点数量不超过阈值，则删除这一天的全部记录。默认阈值为 10。脚本只复制保留下来的原始行文本，不会重新格式化 CSV 字段、数字精度或引号。
+
+可以通过 `--threshold` 调整阈值，例如删除每天数据点数量不超过 20 个的日期：
+
+```bash
+npm run filter -- "灵敢足迹(2020.06.25-2026.05.01).csv" --in-place --threshold 20
+```
 
 如果不想覆盖原文件，可以输出到新文件：
 
 ```bash
-npm run filter -- "灵敢足迹(2020.06.25-2026.05.01).csv" -o "灵敢足迹_filtered.csv"
+npm run filter -- "灵敢足迹(2020.06.25-2026.05.01).csv" -o "灵敢足迹_filtered.csv" --threshold 10
 ```
 
 ### 3. 生成数据
@@ -79,12 +85,12 @@ npm run filter -- "灵敢足迹(2020.06.25-2026.05.01).csv" -o "灵敢足迹_fil
 运行 Node 脚本生成数据：
 
 ```bash
-npm run generate
+npm run generate -- "灵敢足迹(2020.06.25-2026.05.01).csv"
 ```
 
 脚本会：
 
-- 直接读取当前 CSV 数据；如果没有 `date` 字段，会优先根据 `dayTime` 自动计算日期
+- 读取命令行传入的 CSV 数据；如果没有 `date` 字段，会优先根据 `dayTime` 自动计算日期
 - 生成 `all_dates_points.json` 数据文件
 - 确保 `path_labels.json` 存在
 - 确保 `path_favorites.json` 存在
@@ -156,7 +162,7 @@ correctedLng = lng - dLng;
 
 为提高可视化质量，先使用独立脚本过滤数据：
 
-- **规则**：如果某天的轨迹点不超过 10 个，则认为该天没有有效数据
+- **规则**：如果某天的轨迹点不超过指定阈值，则认为该天没有有效数据；默认阈值为 10，可通过 `--threshold` 修改
 - **目的**：避免稀疏数据点造成轨迹断裂或误导
 - **清洗脚本**：`filter_csv_days.py` 可直接覆盖原始 CSV，并保留原始数据行格式
 - **生成脚本**：`generate_map_working.py` 不再依赖 `date` 字段；缺少该字段时会从 `dayTime` 或 `geoTime` 计算
@@ -265,7 +271,7 @@ correctedLng = lng - dLng;
 
 ### Q: 为什么某些日期没有数据？
 
-**A**: 清洗脚本会过滤掉轨迹点不超过 10 个的日期。
+**A**: 清洗脚本会过滤掉轨迹点不超过阈值的日期。默认阈值为 10，可通过 `--threshold` 修改。
 
 ### Q: 坐标位置看起来不准确？
 

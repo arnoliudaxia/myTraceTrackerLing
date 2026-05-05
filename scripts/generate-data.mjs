@@ -6,12 +6,38 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
-const CSV_FILE = path.join(rootDir, '灵敢足迹(2020.06.25-2026.05.01).csv');
 const JSON_FILE = path.join(rootDir, 'all_dates_points.json');
 const PATH_LABELS_FILE = path.join(rootDir, 'path_labels.json');
 const PATH_FAVORITES_FILE = path.join(rootDir, 'path_favorites.json');
 const TIME_ZONE = 'Asia/Shanghai';
 const PATH_GAP_THRESHOLD_MS = 60 * 60 * 1000;
+
+function parseArgs(argv) {
+  const args = { input: null };
+
+  for (const arg of argv) {
+    if (arg === '-h' || arg === '--help') {
+      args.help = true;
+    } else if (!args.input) {
+      args.input = arg;
+    } else {
+      throw new Error(`未知参数: ${arg}`);
+    }
+  }
+
+  if (args.help) {
+    return args;
+  }
+  if (!args.input) {
+    throw new Error('用法: node scripts/generate-data.mjs <input.csv>');
+  }
+  return args;
+}
+
+function printUsage() {
+  console.log('用法: node scripts/generate-data.mjs <input.csv>');
+  console.log('示例: npm run generate -- "灵敢足迹(2020.06.25-2026.05.01).csv"');
+}
 
 function parseCsv(text) {
   const rows = [];
@@ -199,8 +225,9 @@ function buildDayData(segments) {
   };
 }
 
-function generate() {
-  const rows = readCsvObjects(CSV_FILE);
+function generate(inputCsvPath) {
+  const csvPath = path.resolve(inputCsvPath);
+  const rows = readCsvObjects(csvPath);
   const grouped = new Map();
 
   for (const row of rows) {
@@ -232,6 +259,7 @@ function generate() {
   const latestDate = Object.keys(allData).sort().at(-1);
   const totalRecords = Object.values(allData).reduce((sum, day) => sum + day.count, 0);
   console.log(`完成！生成了 ${Object.keys(allData).length} 个日期的数据`);
+  console.log(`输入文件: ${csvPath}`);
   console.log(`总记录数: ${totalRecords}`);
   console.log(`最新日期: ${latestDate} (默认选中)`);
   console.log(`数据文件: ${JSON_FILE}`);
@@ -239,4 +267,15 @@ function generate() {
   console.log(`收藏文件: ${PATH_FAVORITES_FILE}`);
 }
 
-generate();
+try {
+  const args = parseArgs(process.argv.slice(2));
+  if (args.help) {
+    printUsage();
+  } else {
+    generate(args.input);
+  }
+} catch (error) {
+  console.error(`Error: ${error.message}`);
+  printUsage();
+  process.exitCode = 1;
+}

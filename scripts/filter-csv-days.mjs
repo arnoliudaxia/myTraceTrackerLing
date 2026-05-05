@@ -84,6 +84,8 @@ function parseArgs(argv) {
       args.output = argv[++i];
     } else if (arg === '--day-column') {
       args.dayColumn = argv[++i];
+    } else if (arg === '--threshold') {
+      args.maxPoints = Number(argv[++i]);
     } else if (arg === '--max-points') {
       args.maxPoints = Number(argv[++i]);
     } else if (!args.input) {
@@ -94,13 +96,16 @@ function parseArgs(argv) {
   }
 
   if (!args.input) {
-    throw new Error('用法: node scripts/filter-csv-days.mjs <input.csv> [--in-place|-o output.csv]');
+    throw new Error('用法: node scripts/filter-csv-days.mjs <input.csv> [--threshold 数量] [--in-place|-o output.csv]');
   }
   if (args.inPlace && args.output) {
     throw new Error('--in-place 不能和 --output 同时使用');
   }
   if (!Number.isFinite(args.maxPoints)) {
-    throw new Error('--max-points 必须是数字');
+    throw new Error('--threshold 必须是数字');
+  }
+  if (args.maxPoints < 0) {
+    throw new Error('--threshold 不能小于 0');
   }
   return args;
 }
@@ -152,8 +157,10 @@ function filterCsvDays({ input, output, inPlace, dayColumn, maxPoints }) {
 }
 
 try {
-  const stats = filterCsvDays(parseArgs(process.argv.slice(2)));
+  const args = parseArgs(process.argv.slice(2));
+  const stats = filterCsvDays(args);
   console.log(`Output: ${stats.outputPath}`);
+  console.log(`Threshold: remove days with <= ${args.maxPoints} records`);
   console.log(`Original records: ${stats.originalRecords}`);
   console.log(`Kept records: ${stats.keptRecords}`);
   console.log(`Removed records: ${stats.removedRecords}`);
