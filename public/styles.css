@@ -54,6 +54,8 @@
         .quick-label-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; max-height:80px; overflow-y:auto; padding-right:2px; }
         .quick-label-button { padding:6px 4px; border:1px solid #ddd; border-radius:4px; background:#fff; color:#555; font-size:12px; font-family:"Microsoft YaHei",Arial,sans-serif; cursor:pointer; }
         .quick-label-button:hover { border-color:#7c3aed; color:#6d28d9; }
+        .clear-label-button { border-color:#f0caca; background:#fff7f7; color:#9a3412; }
+        .clear-label-button:hover { border-color:#dc2626; color:#991b1b; }
         .quick-label-empty { color:#999; font-size:12px; grid-column:1 / -1; }
         .favorite-panel { margin-top:10px; padding-top:10px; border-top:1px solid #eee; }
         .favorite-panel label { display:block; margin-bottom:5px; color:#666; font-size:12px; font-weight:bold; }

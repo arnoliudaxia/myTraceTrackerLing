@@ -128,6 +128,14 @@ function populateQuickLabelButtons() {
     if (!grid) return;
     grid.innerHTML = '';
 
+    var clearButton = document.createElement('button');
+    clearButton.type = 'button';
+    clearButton.className = 'quick-label-button clear-label-button';
+    clearButton.textContent = '清除标签';
+    clearButton.title = '清除当前选中路径的标签';
+    clearButton.onclick = clearSelectedSegmentLabels;
+    grid.appendChild(clearButton);
+
     var labels = uniqueLabels();
     if (labels.length === 0) {
         var empty = document.createElement('div');
@@ -225,6 +233,25 @@ function applyExistingLabel(label) {
     populateSegmentButtons(allData[currentDate]);
     renderFavorites();
     if (changed) schedulePathLabelsSave();
+}
+
+function clearSelectedSegmentLabels() {
+    if (isLabelMode() || !currentDate || currentSegments.length === 0) return;
+
+    var changed = false;
+    selectedSegmentIndexesForLabeling().forEach(function(segmentIndex) {
+        var key = pathLabelKey(currentDate, segmentIndex);
+        if (pathLabels[key] !== undefined) {
+            delete pathLabels[key];
+            changed = true;
+        }
+    });
+
+    if (!changed) return;
+    populateLabelButtons();
+    populateSegmentButtons(allData[currentDate]);
+    renderFavorites();
+    schedulePathLabelsSave();
 }
 
 function schedulePathLabelsSave() {
