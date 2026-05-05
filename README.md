@@ -9,7 +9,7 @@
 ## ✨ 功能特性
 
 - **📅 日期选择**：通过日历视图选择不同日期查看当天的移动轨迹，仅有轨迹数据的日期可点击
-- **🗺️ 地图源切换**：支持 OpenStreetMap、CartoDB 亮色/暗色三种地图源
+- **🗺️ 地图源切换**：支持 OpenStreetMap、卫星地图-Esri World Imagery 和卫星地图-天地图
 - **📍 轨迹展示**：用蓝色线条连接同一天内的所有轨迹点
 - **🧭 路径分段**：按相邻轨迹点时间差自动区分连续路径和断开路径，支持跨天连续路径合并
 - **🏷️ 路径标签**：可为路径段添加标签，支持复用已有标签快速打标，并跨不同日期同时显示同一标签的路径
@@ -101,7 +101,19 @@ npm start
 http://localhost:3000
 ```
 
-Node 服务会托管 `public/` 前端文件，并提供 `all_dates_points.json`、`path_labels.json`、`path_favorites.json`、标签保存接口和收藏保存接口。
+Node 服务会托管 `public/` 前端文件，并提供 `all_dates_points.json`、`path_labels.json`、`path_favorites.json`、标签保存接口、收藏保存接口和天地图瓦片代理接口。
+
+如果需要使用“卫星地图-天地图”，在项目根目录创建 `.env` 并填写天地图 Key：
+
+```env
+TIANDITU_KEY=你的天地图Key
+```
+
+然后正常启动：
+
+```bash
+npm start
+```
 
 ### 5. 操作说明
 
@@ -179,7 +191,7 @@ correctedLng = lng - dLng;
 
 - **前端**：
   - [Leaflet.js](https://leafletjs.com/) v1.9.4 - 地图可视化库
-  - OpenStreetMap / CartoDB - 地图瓦片服务
+  - OpenStreetMap / Esri World Imagery / 天地图 WMTS - 地图瓦片服务
 
 ## 📊 数据格式
 
@@ -249,7 +261,7 @@ correctedLng = lng - dLng;
 
 ### Q: 地图瓦片加载慢或无法显示？
 
-**A**: 使用右上角的"地图源"下拉菜单切换到 CartoDB 地图源。
+**A**: 使用右上角的“地图源”下拉菜单在 OpenStreetMap、卫星地图-Esri World Imagery 和卫星地图-天地图之间切换。天地图需要在 `.env` 中配置 `TIANDITU_KEY`。
 
 ### Q: 为什么某些日期没有数据？
 
@@ -300,4 +312,5 @@ correctedLng = lng - dLng;
 
 - [Leaflet.js](https://leafletjs.com/) - 优秀的开源地图可视化库
 - [OpenStreetMap](https://www.openstreetmap.org/) - 提供地图瓦片服务
-- [CartoDB](https://carto.com/) - 提供备用地图瓦片服务
+- Esri World Imagery - 提供卫星地图瓦片服务
+- [天地图地图服务](http://lbs.tianditu.gov.cn/server/MapService.html) - 提供 WMTS 影像底图和影像注记服务

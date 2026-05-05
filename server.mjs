@@ -25,6 +25,28 @@ const mimeTypes = new Map([
   ['.svg', 'image/svg+xml'],
 ]);
 
+const tiandituServices = new Set(['vec_w', 'cva_w', 'img_w', 'cia_w', 'ter_w', 'cta_w', 'ibo_w']);
+
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return;
+  const lines = fs.readFileSync(filePath, 'utf8').split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const equalIndex = trimmed.indexOf('=');
+    if (equalIndex === -1) continue;
+    const key = trimmed.slice(0, equalIndex).trim();
+    let value = trimmed.slice(equalIndex + 1).trim();
+    if (!key || process.env[key] !== undefined) continue;
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  }
+}
+
+loadEnvFile(path.join(rootDir, '.env'));
+
 function send(res, statusCode, body, contentType = 'text/plain; charset=utf-8') {
   res.writeHead(statusCode, { 'Content-Type': contentType });
   res.end(body);
@@ -73,6 +95,47 @@ async function handlePathFavoritesSave(req, res) {
   }
 }
 
+async function handleTiandituTile(req, res, url) {
+  const parts = url.pathname.split('/').filter(Boolean);
+  const subdomain = parts[2];
+  const serviceName = parts[3];
+
+  if (!/^t[0-7]$/.test(subdomain) || !tiandituServices.has(serviceName)) {
+    send(res, 404, 'Not found');
+    return;
+  }
+
+  const tk = process.env.TIANDITU_KEY;
+  if (!tk) {
+    send(res, 500, JSON.stringify({ error: '缺少环境变量 TIANDITU_KEY' }), 'application/json; charset=utf-8');
+    return;
+  }
+
+  const upstream = new URL(`https://${subdomain}.tianditu.gov.cn/${serviceName}/wmts`);
+  for (const [key, value] of url.searchParams) {
+    upstream.searchParams.set(key, value);
+  }
+  upstream.searchParams.set('tk', tk);
+
+  try {
+    const response = await fetch(upstream, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        Referer: `http://localhost:${port}/`,
+      },
+    });
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
+    const body = Buffer.from(await response.arrayBuffer());
+    res.writeHead(response.status, {
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=86400',
+    });
+    res.end(body);
+  } catch (error) {
+    send(res, 502, JSON.stringify({ error: error.message }), 'application/json; charset=utf-8');
+  }
+}
+
 function serveFile(filePath, res) {
   if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
     send(res, 404, 'Not found');
@@ -94,6 +157,11 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'POST' && url.pathname === '/api/path-favorites') {
     await handlePathFavoritesSave(req, res);
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname.startsWith('/api/tianditu/')) {
+    await handleTiandituTile(req, res, url);
     return;
   }
 

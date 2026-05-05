@@ -121,14 +121,15 @@
                 <textarea id="favoriteNoteInput" rows="2" placeholder="为选中路径添加备注"></textarea>
                 <button type="button" onclick="favoriteSelectedSegments()">收藏选中路径</button>
             </div>
+            <div id="favoriteSaveStatus" class="favorite-save-status"></div>
             <div id="favoriteList" class="favorite-list"></div>
         </div>
         <div class="tile-selector">
             <label>🗺️ 地图源:</label>
             <select id="tileSelect" onchange="changeTile()">
                 <option value="osm">OpenStreetMap</option>
-                <option value="cartodb">CartoDB 亮色</option>
-                <option value="cartodb_dark">CartoDB 暗色</option>
+                <option value="satellite">卫星地图-Esri World Imagery</option>
+                <option value="tiandituSatellite">卫星地图-天地图</option>
             </select>
         </div>
         <div class="info-grid">

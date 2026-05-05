@@ -60,6 +60,9 @@
         .favorite-editor { display:grid; grid-template-columns:1fr auto; gap:6px; align-items:stretch; }
         .favorite-editor textarea { min-width:0; resize:vertical; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:12px; font-family:"Microsoft YaHei",Arial,sans-serif; line-height:1.35; }
         .favorite-editor button { padding:6px 8px; border:1px solid #d8dee7; border-radius:4px; background:#fff8e5; color:#8a5a00; font-size:12px; cursor:pointer; }
+        .favorite-save-status { min-height:16px; margin-top:5px; color:#777; font-size:11px; }
+        .favorite-save-status.error { color:#b42318; }
+        .favorite-save-status.saved { color:#166534; }
         .favorite-list { display:grid; gap:6px; max-height:150px; overflow-y:auto; margin-top:8px; padding-right:2px; }
         .favorite-item { display:grid; grid-template-columns:1fr auto; gap:6px; align-items:start; padding:7px; border:1px solid #eadcae; border-radius:5px; background:#fffdf5; color:#4b4030; text-align:left; font-family:"Microsoft YaHei",Arial,sans-serif; }
         .favorite-open { min-width:0; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; font-family:inherit; }

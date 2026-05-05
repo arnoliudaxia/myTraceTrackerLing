@@ -1,13 +1,30 @@
+function tiandituTile(serviceName, layerName) {
+    return L.tileLayer(
+        '/api/tianditu/t{s}/' + serviceName + '/wmts?' +
+        'SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0' +
+        '&LAYER=' + layerName +
+        '&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles' +
+        '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
+        {
+            subdomains: ['0', '1', '2', '3', '4', '5', '6', '7'],
+            maxZoom: 18,
+            attribution: '© 天地图'
+        }
+    );
+}
+
 var tileLayers = {
     osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
     }),
-    cartodb: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
-        attribution: '© CARTO'
+    satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles © Esri',
+        maxZoom: 19
     }),
-    cartodb_dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
-        attribution: '© CARTO'
-    })
+    tiandituSatellite: L.layerGroup([
+        tiandituTile('img_w', 'img'),
+        tiandituTile('cia_w', 'cia')
+    ])
 };
 
 function outOfChina(lat,lng){if(lng<72.004||lng>137.8347)return true;if(lat<0.8293||lat>55.8271)return true;return false;}
@@ -43,6 +60,7 @@ var mapRefreshTimer = null;
 
 function changeTile() {
     var tileType = document.getElementById('tileSelect').value;
+    if (!tileLayers[tileType]) tileType = 'osm';
     map.removeLayer(currentTileLayer);
     currentTileLayer = tileLayers[tileType].addTo(map);
     scheduleMapRefresh();
@@ -356,7 +374,7 @@ function renderFavorites() {
             delete pathFavorites[key];
             renderFavorites();
             if (currentDate === date) populateSegmentButtons(allData[currentDate]);
-            schedulePathFavoritesSave();
+            persistPathFavorites({ showStatus: true });
         };
 
         item.appendChild(openButton);
@@ -365,7 +383,14 @@ function renderFavorites() {
     });
 }
 
-function favoriteSelectedSegments() {
+function setFavoriteSaveStatus(message, type) {
+    var status = document.getElementById('favoriteSaveStatus');
+    if (!status) return;
+    status.textContent = message || '';
+    status.className = 'favorite-save-status' + (type ? ' ' + type : '');
+}
+
+async function favoriteSelectedSegments() {
     if (isLabelMode() || !currentDate || currentSegments.length === 0) return;
 
     var noteInput = document.getElementById('favoriteNoteInput');
@@ -388,7 +413,9 @@ function favoriteSelectedSegments() {
     if (noteInput) noteInput.value = '';
     renderFavorites();
     populateSegmentButtons(allData[currentDate]);
-    if (changed) schedulePathFavoritesSave();
+    if (changed) {
+        await persistPathFavorites({ showStatus: true });
+    }
 }
 
 function openFavoritePath(key) {
@@ -422,19 +449,27 @@ function schedulePathFavoritesSave() {
     if (pathFavoritesSaveTimer) clearTimeout(pathFavoritesSaveTimer);
     pathFavoritesSaveTimer = setTimeout(function() {
         pathFavoritesSaveTimer = null;
-        persistPathFavorites();
+        persistPathFavorites({ showStatus: false });
     }, 300);
 }
 
-async function persistPathFavorites() {
+async function persistPathFavorites(options) {
+    var showStatus = options && options.showStatus;
     try {
         var response = await fetch('/api/path-favorites', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(pathFavorites, null, 2)
         });
-        return response.ok;
+        if (response.ok) {
+            if (showStatus) setFavoriteSaveStatus('收藏已保存', 'saved');
+            return true;
+        }
+        if (showStatus) setFavoriteSaveStatus('收藏保存失败：请重启 Node 服务后重试', 'error');
+        console.warn('Unable to save path_favorites.json. HTTP status:', response.status);
+        return false;
     } catch (error) {
+        if (showStatus) setFavoriteSaveStatus('收藏保存失败：请确认正在通过 npm start 打开页面', 'error');
         console.warn('Unable to auto-save path_favorites.json. Please make sure the Node server is running.');
         return false;
     }
