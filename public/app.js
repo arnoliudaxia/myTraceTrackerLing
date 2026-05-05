@@ -513,7 +513,7 @@ function formatSpeed(value) {
 }
 
 function formatMetric(metric, value) {
-    return metric === 'speed' ? formatSpeed(value) : formatAltitude(value);
+    return formatSpeed(value);
 }
 
 function parseDateKey(dateKey) {
@@ -588,14 +588,11 @@ function changeCalendarMonth(offset) {
 }
 
 function metricLabel(metric) {
-    return metric === 'speed' ? '速度路径' : '海拔路径';
+    return '速度路径';
 }
 
 function metricValues(data, metric) {
-    if (metric === 'speed') {
-        return { values: data.speeds, min: data.speed_min, max: data.speed_max };
-    }
-    return { values: data.elevations, min: data.altitude_min, max: data.altitude_max };
+    return { values: data.speeds, min: data.speed_min, max: data.speed_max };
 }
 
 function buildSegments(data) {
@@ -929,7 +926,7 @@ function updateLabelModeInfoCards(stats) {
 function drawMetricForLabelRef(ref, correctedPoints, metricStats) {
     if (!activeMetric) return;
     var metric = metricValues(ref.data, activeMetric);
-    var statsRange = activeMetric === 'speed' ? metricStats.speed : metricStats.altitude;
+    var statsRange = metricStats.speed;
     if (!metric.values || statsRange.min === null || statsRange.max === null) return;
 
     var stepsPerSegment = 8;
@@ -1019,12 +1016,9 @@ function renderLabelMode() {
 }
 
 function updateMetricUi(data) {
-    var altitudeButton = document.getElementById('altitudeToggle');
     var speedButton = document.getElementById('speedToggle');
     var legend = document.getElementById('metricLegend');
-    altitudeButton.textContent = activeMetric === 'altitude' ? '海拔路径：开启' : '海拔路径：关闭';
     speedButton.textContent = activeMetric === 'speed' ? '速度路径：开启' : '速度路径：关闭';
-    altitudeButton.classList.toggle('active', activeMetric === 'altitude');
     speedButton.classList.toggle('active', activeMetric === 'speed');
     legend.classList.toggle('active', activeMetric !== null);
 
@@ -1032,7 +1026,7 @@ function updateMetricUi(data) {
 
     if (activeMetric) {
         var stats = currentSelectionStats(data);
-        var metric = activeMetric === 'speed' ? stats.speed : stats.altitude;
+        var metric = stats.speed;
         document.getElementById('metricLegendTitle').textContent = metricLabel(activeMetric);
         document.getElementById('metricMinLabel').textContent = metric.min === null ? '低' : formatMetric(activeMetric, metric.min);
         document.getElementById('metricMaxLabel').textContent = metric.max === null ? '高' : formatMetric(activeMetric, metric.max);
@@ -1044,17 +1038,14 @@ function updateMetricUi(data) {
 }
 
 function updateMetricUiForStats(stats) {
-    var altitudeButton = document.getElementById('altitudeToggle');
     var speedButton = document.getElementById('speedToggle');
     var legend = document.getElementById('metricLegend');
-    altitudeButton.textContent = activeMetric === 'altitude' ? '海拔路径：开启' : '海拔路径：关闭';
     speedButton.textContent = activeMetric === 'speed' ? '速度路径：开启' : '速度路径：关闭';
-    altitudeButton.classList.toggle('active', activeMetric === 'altitude');
     speedButton.classList.toggle('active', activeMetric === 'speed');
     legend.classList.toggle('active', activeMetric !== null);
 
     if (activeMetric) {
-        var metric = activeMetric === 'speed' ? stats.speed : stats.altitude;
+        var metric = stats.speed;
         document.getElementById('metricLegendTitle').textContent = metricLabel(activeMetric);
         document.getElementById('metricMinLabel').textContent = metric.min === null ? '低' : formatMetric(activeMetric, metric.min);
         document.getElementById('metricMaxLabel').textContent = metric.max === null ? '高' : formatMetric(activeMetric, metric.max);
@@ -1063,11 +1054,6 @@ function updateMetricUiForStats(stats) {
         document.getElementById('metricMinLabel').textContent = '低';
         document.getElementById('metricMaxLabel').textContent = '高';
     }
-}
-
-function toggleAltitudeMode() {
-    activeMetric = activeMetric === 'altitude' ? null : 'altitude';
-    applyMetricMode();
 }
 
 function toggleSpeedMode() {
