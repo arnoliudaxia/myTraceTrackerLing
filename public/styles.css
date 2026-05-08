@@ -26,6 +26,19 @@
         .info-item .label { color:#999; font-size:11px; margin-bottom:2px; }
         .info-item .value { color:#333; font-weight:bold; }
         .legend { position:fixed; bottom:30px; right:10px; background:white; padding:12px; border-radius:5px; box-shadow:0 2px 10px rgba(0,0,0,0.3); z-index:1000; font-size:12px; }
+        .admin-panel { position:fixed; top:10px; right:10px; width:300px; background:white; padding:14px; border-radius:8px; box-shadow:0 2px 15px rgba(0,0,0,0.3); z-index:1000; font-size:12px; }
+        .admin-panel h3 { margin:0 0 10px 0; color:#333; font-size:16px; }
+        .admin-search { display:grid; grid-template-columns:1fr auto; gap:6px; }
+        .admin-search input { min-width:0; padding:7px; border:1px solid #ddd; border-radius:4px; font-size:12px; font-family:"Microsoft YaHei",Arial,sans-serif; }
+        .admin-search button, .admin-actions button { padding:7px 10px; border:1px solid #ccd6e0; border-radius:4px; background:#f8fbff; color:#2c5c86; font-size:12px; font-family:"Microsoft YaHei",Arial,sans-serif; cursor:pointer; }
+        .admin-panel select { width:100%; margin-top:8px; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:12px; font-family:"Microsoft YaHei",Arial,sans-serif; }
+        .admin-actions { margin-top:8px; display:flex; justify-content:flex-end; }
+        .admin-cascade { margin-top:10px; padding-top:10px; border-top:1px solid #eee; }
+        .admin-section-title { color:#666; font-size:12px; font-weight:bold; }
+        .admin-status { margin-top:8px; color:#777; line-height:1.4; }
+        .admin-status.error { color:#b42318; }
+        .admin-status.loading { color:#2c5c86; }
+        .admin-meta { margin-top:6px; color:#555; line-height:1.45; word-break:break-word; }
         .legend-item { margin:6px 0; display:flex; align-items:center; }
         .legend-color { display:inline-block; width:24px; height:3px; margin-right:8px; }
         .legend-dot { display:inline-block; width:12px; height:12px; border-radius:50%; margin-right:8px; }

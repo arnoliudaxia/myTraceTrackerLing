@@ -13,7 +13,23 @@ function tiandituTile(serviceName, layerName) {
     );
 }
 
+function tracestrackTopoTile() {
+    return L.tileLayer('/api/tracestrack/topo/{z}/{x}/{y}.webp', {
+        maxZoom: 19,
+        attribution: 'Map data © OpenStreetMap contributors; Maps © Tracestrack'
+    });
+}
+
+function geovisEarthTile(tileType) {
+    return L.tileLayer('/api/geovis/' + tileType + '/{z}/{x}/{y}?format=webp&tmsIds=w', {
+        maxZoom: 18,
+        minZoom: 3,
+        attribution: '© GEOVIS Earth'
+    });
+}
+
 var tileLayers = {
+    osmTerrain: tracestrackTopoTile(),
     osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
     }),
@@ -24,7 +40,8 @@ var tileLayers = {
     tiandituSatellite: L.layerGroup([
         tiandituTile('img_w', 'img'),
         tiandituTile('cia_w', 'cia')
-    ])
+    ]),
+    geovisSatellite: geovisEarthTile('img')
 };
 
 function outOfChina(lat,lng){if(lng<72.004||lng>137.8347)return true;if(lat<0.8293||lat>55.8271)return true;return false;}
@@ -38,7 +55,7 @@ var pathLabels = {};
 var pathFavorites = {};
 var selectedLabels = [];
 var map = L.map('map').setView([31.23, 121.47], 12);
-var currentTileLayer = tileLayers.osm.addTo(map);
+var currentTileLayer = tileLayers.osmTerrain.addTo(map);
 var currentLayer = null;
 var metricLayer = null;
 var dataPointLayer = null;
@@ -57,10 +74,13 @@ var availableDateSet = new Set();
 var calendarViewYear = null;
 var calendarViewMonth = null;
 var mapRefreshTimer = null;
+var adminBoundaryResults = [];
+var adminBoundaryLayer = null;
+var shanghaiAdminIndex = [];
 
 function changeTile() {
     var tileType = document.getElementById('tileSelect').value;
-    if (!tileLayers[tileType]) tileType = 'osm';
+    if (!tileLayers[tileType]) tileType = 'osmTerrain';
     map.removeLayer(currentTileLayer);
     currentTileLayer = tileLayers[tileType].addTo(map);
     scheduleMapRefresh();
@@ -81,7 +101,239 @@ function scheduleMapRefresh() {
         redrawLeafletLayer(currentLayer);
         redrawLeafletLayer(metricLayer);
         redrawLeafletLayer(dataPointLayer);
+        redrawLeafletLayer(adminBoundaryLayer);
     });
+}
+
+function setAdminBoundaryStatus(message, type) {
+    var status = document.getElementById('adminBoundaryStatus');
+    if (!status) return;
+    status.textContent = message || '';
+    status.className = 'admin-status' + (type ? ' ' + type : '');
+}
+
+function adminBoundaryLabel(feature) {
+    var properties = feature && feature.properties ? feature.properties : {};
+    return properties.display_name || properties.name || '未命名行政区划';
+}
+
+function adminBoundaryMeta(feature) {
+    var properties = feature && feature.properties ? feature.properties : {};
+    var parts = [];
+    if (properties.osm_type && properties.osm_id) parts.push('OSM: ' + properties.osm_type + '/' + properties.osm_id);
+    if (properties.class || properties.type) parts.push([properties.class, properties.type].filter(Boolean).join('/'));
+    if (properties.admin_level) parts.push('admin_level=' + properties.admin_level);
+    return parts.join(' · ');
+}
+
+function populateAdminBoundarySelect(features) {
+    var selector = document.getElementById('adminBoundarySelect');
+    if (!selector) return;
+    selector.innerHTML = '';
+
+    if (!features.length) {
+        var emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = '没有找到可显示边界';
+        selector.appendChild(emptyOption);
+        return;
+    }
+
+    features.forEach(function(feature, index) {
+        var option = document.createElement('option');
+        option.value = String(index);
+        option.textContent = adminBoundaryLabel(feature);
+        selector.appendChild(option);
+    });
+}
+
+async function searchAdminBoundaries() {
+    var input = document.getElementById('adminSearchInput');
+    var query = input ? input.value.trim() : '';
+    if (!query) {
+        if (input) input.focus();
+        setAdminBoundaryStatus('请输入要搜索的行政区划名称', 'error');
+        return;
+    }
+
+    setAdminBoundaryStatus('正在从 OpenStreetMap 搜索边界...', 'loading');
+    try {
+        var response = await fetch('/api/osm/admin-boundaries?q=' + encodeURIComponent(query));
+        var payload = await response.json();
+        if (!response.ok) {
+            throw new Error(payload.error || '搜索失败');
+        }
+        adminBoundaryResults = payload.features || [];
+        populateAdminBoundarySelect(adminBoundaryResults);
+        if (!adminBoundaryResults.length) {
+            clearAdminBoundary();
+            setAdminBoundaryStatus('没有找到带边界范围的行政区划', 'error');
+            return;
+        }
+        setAdminBoundaryStatus('找到 ' + adminBoundaryResults.length + ' 个结果，已显示第 1 个', '');
+        showSelectedAdminBoundary();
+    } catch (error) {
+        setAdminBoundaryStatus(error.message || '行政区划搜索失败', 'error');
+    }
+}
+
+function clearAdminBoundary() {
+    if (adminBoundaryLayer) {
+        map.removeLayer(adminBoundaryLayer);
+        adminBoundaryLayer = null;
+    }
+    var meta = document.getElementById('adminBoundaryMeta');
+    if (meta) meta.textContent = '';
+    scheduleMapRefresh();
+}
+
+function showSelectedAdminBoundary() {
+    var selector = document.getElementById('adminBoundarySelect');
+    if (!selector || selector.value === '') return;
+    var feature = adminBoundaryResults[Number(selector.value)];
+    if (!feature || !feature.geometry) {
+        setAdminBoundaryStatus('该结果没有可绘制的边界范围', 'error');
+        return;
+    }
+    drawAdminBoundaryFeature(feature);
+}
+
+function drawAdminBoundaryFeature(feature) {
+    clearAdminBoundary();
+    adminBoundaryLayer = L.geoJSON(feature, {
+        style: {
+            color: '#dc2626',
+            weight: 3,
+            opacity: 0.95,
+            dashArray: '8, 6',
+            fillColor: '#f97316',
+            fillOpacity: 0.08
+        }
+    }).addTo(map);
+    adminBoundaryLayer.bindPopup('<b>行政区划</b><br>' + adminBoundaryLabel(feature));
+
+    var bounds = adminBoundaryLayer.getBounds();
+    if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [50, 50] });
+    }
+
+    var meta = document.getElementById('adminBoundaryMeta');
+    if (meta) meta.textContent = adminBoundaryMeta(feature);
+    setAdminBoundaryStatus('已显示：' + adminBoundaryLabel(feature), '');
+    scheduleMapRefresh();
+}
+
+function populateShanghaiDistrictSelect() {
+    var selector = document.getElementById('shanghaiDistrictSelect');
+    if (!selector) return;
+    selector.innerHTML = '';
+
+    if (!shanghaiAdminIndex.length) {
+        var empty = document.createElement('option');
+        empty.value = '';
+        empty.textContent = '暂无上海区划数据';
+        selector.appendChild(empty);
+        return;
+    }
+
+    var placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = '选择区';
+    selector.appendChild(placeholder);
+
+    shanghaiAdminIndex.forEach(function(district, index) {
+        var option = document.createElement('option');
+        option.value = String(index);
+        option.textContent = district.name + (district.children.length ? ' (' + district.children.length + ')' : '');
+        selector.appendChild(option);
+    });
+}
+
+function populateShanghaiTownSelect(district) {
+    var selector = document.getElementById('shanghaiTownSelect');
+    if (!selector) return;
+    selector.innerHTML = '';
+
+    var placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = district ? '选择镇、街道' : '先选择区';
+    selector.appendChild(placeholder);
+
+    if (!district) return;
+    district.children.forEach(function(child, index) {
+        var option = document.createElement('option');
+        option.value = String(index);
+        option.textContent = child.name;
+        selector.appendChild(option);
+    });
+}
+
+async function loadShanghaiAdminIndex() {
+    setAdminBoundaryStatus('正在加载上海市区划索引...', 'loading');
+    try {
+        var response = await fetch('/api/osm/shanghai-admin-index');
+        var payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || '上海区划索引加载失败');
+        shanghaiAdminIndex = payload.districts || [];
+        populateShanghaiDistrictSelect();
+        populateShanghaiTownSelect(null);
+        setAdminBoundaryStatus('上海市区划索引已加载：' + shanghaiAdminIndex.length + ' 个区', '');
+    } catch (error) {
+        populateShanghaiDistrictSelect();
+        populateShanghaiTownSelect(null);
+        setAdminBoundaryStatus(error.message || '上海区划索引加载失败', 'error');
+    }
+}
+
+function selectedShanghaiDistrict() {
+    var selector = document.getElementById('shanghaiDistrictSelect');
+    if (!selector || selector.value === '') return null;
+    return shanghaiAdminIndex[Number(selector.value)] || null;
+}
+
+function selectedShanghaiTown() {
+    var district = selectedShanghaiDistrict();
+    var selector = document.getElementById('shanghaiTownSelect');
+    if (!district || !selector || selector.value === '') return null;
+    return district.children[Number(selector.value)] || null;
+}
+
+function changeShanghaiDistrict() {
+    populateShanghaiTownSelect(selectedShanghaiDistrict());
+}
+
+async function fetchOsmBoundaryFeature(item) {
+    var url = '/api/osm/boundary?osmType=' + encodeURIComponent(item.osmType) + '&osmId=' + encodeURIComponent(item.osmId);
+    var response = await fetch(url);
+    var payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || '边界加载失败');
+    if (!payload.features || !payload.features.length) throw new Error('该区划没有可绘制边界');
+    return payload.features[0];
+}
+
+async function showSelectedShanghaiDistrict() {
+    var district = selectedShanghaiDistrict();
+    if (!district) {
+        setAdminBoundaryStatus('请先选择区', 'error');
+        return;
+    }
+    setAdminBoundaryStatus('正在加载 ' + district.name + ' 边界...', 'loading');
+    try {
+        drawAdminBoundaryFeature(await fetchOsmBoundaryFeature(district));
+    } catch (error) {
+        setAdminBoundaryStatus(error.message || '边界加载失败', 'error');
+    }
+}
+
+async function showSelectedShanghaiBoundary() {
+    var item = selectedShanghaiTown();
+    if (!item) return;
+    setAdminBoundaryStatus('正在加载 ' + item.name + ' 边界...', 'loading');
+    try {
+        drawAdminBoundaryFeature(await fetchOsmBoundaryFeature(item));
+    } catch (error) {
+        setAdminBoundaryStatus(error.message || '边界加载失败', 'error');
+    }
 }
 
 function pathLabelKey(date, segmentIndex) {
@@ -1244,3 +1496,14 @@ Promise.all([
 L.control.scale({ imperial:false }).addTo(map);
 window.addEventListener('load', scheduleMapRefresh);
 window.addEventListener('resize', scheduleMapRefresh);
+window.addEventListener('load', function() {
+    var input = document.getElementById('adminSearchInput');
+    if (!input) return;
+    input.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            searchAdminBoundaries();
+        }
+    });
+    loadShanghaiAdminIndex();
+});

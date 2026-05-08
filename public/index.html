@@ -20,10 +20,6 @@
                 <button type="button" onclick="applyLabelToSelectedSegments()">应用</button>
                 <button type="button" onclick="savePathLabels()">保存</button>
             </div>
-            <div class="quick-labels">
-                <div class="quick-label-title">快捷打标签</div>
-                <div id="quickLabelGrid" class="quick-label-grid"></div>
-            </div>
         </div>
         <div id="labelModeHint" class="mode-hint">标签模式：日期选择暂时无效</div>
         <div id="dateSelectorPanel" class="date-selector">
@@ -114,6 +110,10 @@
                 <input id="dimOpacityRange" type="range" min="5" max="80" step="5" value="30" oninput="changeDimOpacity()">
             </div>
         </div>
+        <div class="quick-labels">
+            <div class="quick-label-title">快捷打标签</div>
+            <div id="quickLabelGrid" class="quick-label-grid"></div>
+        </div>
         <div class="favorite-panel">
             <label>⭐ 收藏夹:</label>
             <div class="favorite-editor">
@@ -126,9 +126,11 @@
         <div class="tile-selector">
             <label>🗺️ 地图源:</label>
             <select id="tileSelect" onchange="changeTile()">
+                <option value="osmTerrain" selected>OpenStreetMap 地形地貌</option>
                 <option value="osm">OpenStreetMap</option>
                 <option value="satellite">卫星地图-Esri World Imagery</option>
                 <option value="tiandituSatellite">卫星地图-天地图</option>
+                <option value="geovisSatellite">卫星地图-星图地球影像</option>
             </select>
         </div>
         <div class="info-grid">
@@ -165,6 +167,33 @@
     </div>
     <div class="stats-panel">
         📊 总日期数: 61 | 总记录数: 6055
+    </div>
+    <div class="admin-panel">
+        <h3>行政区划</h3>
+        <div class="admin-search">
+            <input id="adminSearchInput" type="text" placeholder="输入省、市、区县或街镇">
+            <button type="button" onclick="searchAdminBoundaries()">搜索</button>
+        </div>
+        <select id="adminBoundarySelect" onchange="showSelectedAdminBoundary()">
+            <option value="">先搜索行政区划</option>
+        </select>
+        <div class="admin-actions">
+            <button type="button" onclick="clearAdminBoundary()">清除范围</button>
+        </div>
+        <div class="admin-cascade">
+            <div class="admin-section-title">上海市多级选择</div>
+            <select id="shanghaiDistrictSelect" onchange="changeShanghaiDistrict()">
+                <option value="">正在加载区划...</option>
+            </select>
+            <select id="shanghaiTownSelect" onchange="showSelectedShanghaiBoundary()">
+                <option value="">先选择区</option>
+            </select>
+            <div class="admin-actions">
+                <button type="button" onclick="showSelectedShanghaiDistrict()">显示区范围</button>
+            </div>
+        </div>
+        <div id="adminBoundaryStatus" class="admin-status">数据源：OpenStreetMap</div>
+        <div id="adminBoundaryMeta" class="admin-meta"></div>
     </div>
     <script src=app.js></script>
 </body>
