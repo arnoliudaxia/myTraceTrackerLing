@@ -29,7 +29,6 @@ const tiandituServices = new Set(['vec_w', 'cva_w', 'img_w', 'cia_w', 'ter_w', '
 const geovisTileTypes = new Set(['img', 'cia']);
 const geovisTileFormat = new Set(['webp']);
 const geovisTmsIds = new Set(['w', 'c']);
-const tracestrackStyles = new Set(['topo']);
 const shanghaiAreaId = 3600913067;
 const shanghaiAdminCacheTtlMs = 6 * 60 * 60 * 1000;
 let shanghaiAdminCache = null;
@@ -195,9 +194,9 @@ async function handleGeovisImageTile(req, res, url) {
 
 async function handleTracestrackTile(req, res, url) {
   const parts = url.pathname.split('/').filter(Boolean);
-  const [apiPrefix, provider, styleName, z, x, yFile] = parts;
+  const [apiPrefix, provider, z, x, yFile] = parts;
 
-  if (apiPrefix !== 'api' || provider !== 'tracestrack' || !tracestrackStyles.has(styleName)) {
+  if (apiPrefix !== 'api' || provider !== 'tracestrack') {
     send(res, 404, 'Not found');
     return;
   }
@@ -207,13 +206,20 @@ async function handleTracestrackTile(req, res, url) {
     return;
   }
 
-  const upstream = new URL(`https://tile.tracestrack.com/topo__/${z}/${x}/${yMatch[1]}.webp`);
+  const key = process.env.TRACESTRACK_KEY;
+  if (!key) {
+    send(res, 500, JSON.stringify({ error: '缺少环境变量 TRACESTRACK_KEY' }), 'application/json; charset=utf-8');
+    return;
+  }
+
+  const upstream = new URL(`https://tile.tracestrack.com/_/${z}/${x}/${yMatch[1]}.webp`);
+  upstream.searchParams.set('key', key);
 
   try {
     const response = await fetch(upstream, {
       headers: {
         'User-Agent': 'Mozilla/5.0',
-        Referer: 'https://www.openstreetmap.org/',
+        Referer: `http://localhost:${port}/`,
       },
     });
     const contentType = response.headers.get('content-type') || 'image/webp';

@@ -13,13 +13,6 @@ function tiandituTile(serviceName, layerName) {
     );
 }
 
-function tracestrackTopoTile() {
-    return L.tileLayer('/api/tracestrack/topo/{z}/{x}/{y}.webp', {
-        maxZoom: 19,
-        attribution: 'Map data © OpenStreetMap contributors; Maps © Tracestrack'
-    });
-}
-
 function geovisEarthTile(tileType) {
     return L.tileLayer('/api/geovis/' + tileType + '/{z}/{x}/{y}?format=webp&tmsIds=w', {
         maxZoom: 18,
@@ -28,11 +21,18 @@ function geovisEarthTile(tileType) {
     });
 }
 
+function tracestrackTile() {
+    return L.tileLayer('/api/tracestrack/{z}/{x}/{y}.webp', {
+        maxZoom: 19,
+        attribution: 'Map data © OpenStreetMap contributors; Maps © Tracestrack'
+    });
+}
+
 var tileLayers = {
-    osmTerrain: tracestrackTopoTile(),
     osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
     }),
+    tracestrack: tracestrackTile(),
     satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles © Esri',
         maxZoom: 19
@@ -55,7 +55,7 @@ var pathLabels = {};
 var pathFavorites = {};
 var selectedLabels = [];
 var map = L.map('map').setView([31.23, 121.47], 12);
-var currentTileLayer = tileLayers.osmTerrain.addTo(map);
+var currentTileLayer = tileLayers.osm.addTo(map);
 var currentLayer = null;
 var metricLayer = null;
 var dataPointLayer = null;
@@ -80,7 +80,7 @@ var shanghaiAdminIndex = [];
 
 function changeTile() {
     var tileType = document.getElementById('tileSelect').value;
-    if (!tileLayers[tileType]) tileType = 'osmTerrain';
+    if (!tileLayers[tileType]) tileType = 'osm';
     map.removeLayer(currentTileLayer);
     currentTileLayer = tileLayers[tileType].addTo(map);
     scheduleMapRefresh();
