@@ -2,8 +2,21 @@
         html, body { margin:0; height:100%; }
         body { font-family:"Microsoft YaHei",Arial,sans-serif; }
         #map { width:100%; height:100vh; }
-        .control-panel { position:fixed; top:10px; left:50px; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 15px rgba(0,0,0,0.3); z-index:1000; width:340px; max-width:340px; max-height:calc(100vh - 20px); overflow-y:auto; box-sizing:border-box; }
-        .control-panel h2 { margin:0 0 12px 0; color:#333; font-size:18px; }
+        .control-panel { position:fixed; top:10px; left:10px; background:white; padding:15px; border-radius:8px; box-shadow:0 2px 15px rgba(0,0,0,0.3); z-index:1000; width:340px; max-width:340px; max-height:calc(100vh - 20px); overflow-y:auto; box-sizing:border-box; }
+        .panel-header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+        .control-panel h2 { margin:0; color:#333; font-size:18px; }
+        .panel-actions { display:flex; align-items:center; gap:8px; flex:0 0 auto; }
+        .panel-icon-button { width:34px; height:34px; flex:0 0 auto; border:1px solid #ddd6fe; border-radius:8px; background:#faf5ff; color:#6d28d9; font-size:17px; line-height:1; font-family:"Microsoft YaHei",Arial,sans-serif; cursor:pointer; box-shadow:0 1px 4px rgba(109,40,217,0.14); }
+        .panel-icon-button:hover, .panel-icon-button.active { border-color:#7c3aed; background:#7c3aed; color:white; }
+        .favorite-toggle { border-color:#fde68a; background:#fff8e5; color:#8a5a00; }
+        .favorite-toggle:hover, .favorite-toggle.active { border-color:#f59e0b; background:#f59e0b; color:white; }
+        .label-management-panel, .favorite-management-panel { position:fixed; top:10px; left:360px; width:300px; max-width:calc(100vw - 380px); max-height:calc(100vh - 20px); overflow-y:auto; background:white; padding:14px; border-radius:8px; box-shadow:0 2px 15px rgba(0,0,0,0.3); z-index:1000; transform:translateX(-10px); opacity:0; pointer-events:none; transition:opacity 0.18s ease, transform 0.18s ease; box-sizing:border-box; }
+        .label-management-panel.open, .favorite-management-panel.open { transform:translateX(0); opacity:1; pointer-events:auto; }
+        .label-panel-header { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid #eee; }
+        .label-panel-title { color:#333; font-size:16px; font-weight:bold; }
+        .label-panel-subtitle { margin-top:3px; color:#888; font-size:11px; line-height:1.4; }
+        .label-panel-close { width:26px; height:26px; border:1px solid #e5e7eb; border-radius:6px; background:#f9fafb; color:#666; font-size:18px; line-height:1; cursor:pointer; }
+        .label-panel-close:hover { border-color:#c4b5fd; color:#6d28d9; background:#faf5ff; }
         .date-selector { margin-bottom:12px; }
         .date-selector.disabled { opacity:0.45; pointer-events:none; }
         .date-selector label { display:block; margin-bottom:5px; color:#666; font-size:14px; font-weight:bold; }
@@ -56,12 +69,19 @@
         .dim-opacity-control { margin-top:8px; padding-top:8px; border-top:1px solid #eee; }
         .dim-opacity-control label { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; color:#666; font-size:12px; }
         .dim-opacity-control input { width:100%; accent-color:#3388ff; }
-        .label-selector { margin-bottom:12px; }
+        .label-selector { margin-bottom:0; }
         .label-selector label { display:block; margin-bottom:5px; color:#666; font-size:12px; font-weight:bold; }
-        .label-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; max-height:96px; overflow-y:auto; padding-right:2px; }
+        .label-grid { display:grid; grid-template-columns:1fr; gap:6px; max-height:180px; overflow-y:auto; padding-right:2px; }
         .label-button { padding:6px 4px; border:1px solid #ddd; border-radius:4px; background:#fafafa; color:#555; font-size:12px; font-family:"Microsoft YaHei",Arial,sans-serif; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .label-button.active { background:#7c3aed; border-color:#7c3aed; color:white; font-weight:bold; }
-        .label-editor { display:grid; grid-template-columns:1fr auto auto; gap:6px; margin-top:8px; }
+        .date-mode-button { width:100%; }
+        .label-manage-item { display:grid; grid-template-columns:minmax(0, 1fr) auto auto; gap:5px; align-items:center; }
+        .label-filter-button { min-width:0; text-align:left; padding-left:8px; }
+        .label-action-button { padding:6px 7px; border:1px solid #ddd; border-radius:4px; background:#fff; color:#555; font-size:12px; font-family:"Microsoft YaHei",Arial,sans-serif; cursor:pointer; }
+        .label-action-button:hover { border-color:#7c3aed; color:#6d28d9; background:#faf5ff; }
+        .label-action-button.danger { border-color:#f0caca; color:#9a3412; }
+        .label-action-button.danger:hover { border-color:#dc2626; color:#991b1b; background:#fff7f7; }
+        .label-editor { display:grid; grid-template-columns:1fr auto; gap:6px; margin-top:8px; }
         .label-editor input { min-width:0; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:12px; }
         .label-editor button { padding:6px 8px; border:1px solid #ccd6e0; border-radius:4px; background:#f8fbff; color:#2c5c86; font-size:12px; cursor:pointer; }
         .quick-labels { margin-top:8px; }
@@ -72,7 +92,7 @@
         .clear-label-button { border-color:#f0caca; background:#fff7f7; color:#9a3412; }
         .clear-label-button:hover { border-color:#dc2626; color:#991b1b; }
         .quick-label-empty { color:#999; font-size:12px; grid-column:1 / -1; }
-        .favorite-panel { margin-top:10px; padding-top:10px; border-top:1px solid #eee; }
+        .favorite-panel { margin-top:0; }
         .favorite-panel label { display:block; margin-bottom:5px; color:#666; font-size:12px; font-weight:bold; }
         .favorite-editor { display:grid; grid-template-columns:1fr auto; gap:6px; align-items:stretch; }
         .favorite-editor textarea { min-width:0; resize:vertical; padding:6px; border:1px solid #ddd; border-radius:4px; font-size:12px; font-family:"Microsoft YaHei",Arial,sans-serif; line-height:1.35; }
@@ -80,7 +100,7 @@
         .favorite-save-status { min-height:16px; margin-top:5px; color:#777; font-size:11px; }
         .favorite-save-status.error { color:#b42318; }
         .favorite-save-status.saved { color:#166534; }
-        .favorite-list { display:grid; gap:6px; max-height:150px; overflow-y:auto; margin-top:8px; padding-right:2px; }
+        .favorite-list { display:grid; gap:6px; max-height:calc(100vh - 220px); overflow-y:auto; margin-top:8px; padding-right:2px; }
         .favorite-item { display:grid; grid-template-columns:1fr auto; gap:6px; align-items:start; padding:7px; border:1px solid #eadcae; border-radius:5px; background:#fffdf5; color:#4b4030; text-align:left; font-family:"Microsoft YaHei",Arial,sans-serif; overflow:hidden; }
         .favorite-open { min-width:0; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; font-family:inherit; }
         .favorite-title { font-size:12px; font-weight:bold; color:#6b4b00; word-break:break-word; }
@@ -101,3 +121,6 @@
         .calendar-day.favorited { border-color:#f2c94c; background:#fff8e5; color:#7a5200; }
         .calendar-day.available.favorited:hover { background:#fff0cc; }
         .calendar-day.active.favorited { background:#3388ff; border-color:#3388ff; color:white; }
+        @media (max-width: 760px) {
+            .label-management-panel, .favorite-management-panel { top:72px; left:10px; right:10px; width:auto; max-width:none; }
+        }

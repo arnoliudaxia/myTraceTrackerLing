@@ -7,8 +7,10 @@ import {
   getAllData,
   getPathLabels,
   getPathFavorites,
+  getCustomLabels,
   setPathLabels,
   setPathFavorites,
+  setCustomLabels,
 } from './lib/db.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -98,6 +100,21 @@ async function handlePathFavoritesSave(req, res) {
       return;
     }
     setPathFavorites(favorites);
+    send(res, 200, JSON.stringify({ ok: true }), 'application/json; charset=utf-8');
+  } catch (error) {
+    send(res, 400, JSON.stringify({ error: error.message }), 'application/json; charset=utf-8');
+  }
+}
+
+async function handleCustomLabelsSave(req, res) {
+  try {
+    const body = await readBody(req);
+    const labels = JSON.parse(body || '[]');
+    if (!Array.isArray(labels)) {
+      send(res, 400, JSON.stringify({ error: '标签数据必须是数组' }), 'application/json; charset=utf-8');
+      return;
+    }
+    setCustomLabels(labels);
     send(res, 200, JSON.stringify({ ok: true }), 'application/json; charset=utf-8');
   } catch (error) {
     send(res, 400, JSON.stringify({ error: error.message }), 'application/json; charset=utf-8');
@@ -486,6 +503,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'POST' && url.pathname === '/api/custom-labels') {
+    await handleCustomLabelsSave(req, res);
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname.startsWith('/api/tianditu/')) {
     await handleTiandituTile(req, res, url);
     return;
@@ -528,6 +550,11 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'GET' && url.pathname === '/path_favorites.json') {
     send(res, 200, JSON.stringify(getPathFavorites()), 'application/json; charset=utf-8');
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/custom_labels.json') {
+    send(res, 200, JSON.stringify(getCustomLabels()), 'application/json; charset=utf-8');
     return;
   }
 

@@ -53,8 +53,9 @@ function correctTrackPoints(points){return points.map(function(p){return correct
 var allData = null;
 var pathLabels = {};
 var pathFavorites = {};
+var customLabels = [];
 var selectedLabels = [];
-var map = L.map('map').setView([31.23, 121.47], 12);
+var map = L.map('map', { zoomControl: false }).setView([31.23, 121.47], 12);
 var currentTileLayer = tileLayers.osm.addTo(map);
 var currentLayer = null;
 var metricLayer = null;
@@ -77,6 +78,46 @@ var mapRefreshTimer = null;
 var adminBoundaryResults = [];
 var adminBoundaryLayer = null;
 var shanghaiAdminIndex = [];
+
+function setLabelPanelOpen(open) {
+    var panel = document.getElementById('labelManagementPanel');
+    var toggle = document.getElementById('labelPanelToggle');
+    if (!panel || !toggle) return;
+    if (open) setFavoritePanelOpen(false);
+    panel.classList.toggle('open', open);
+    panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+    toggle.classList.toggle('active', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+function toggleLabelPanel() {
+    var panel = document.getElementById('labelManagementPanel');
+    setLabelPanelOpen(!panel || !panel.classList.contains('open'));
+}
+
+function closeLabelPanel() {
+    setLabelPanelOpen(false);
+}
+
+function setFavoritePanelOpen(open) {
+    var panel = document.getElementById('favoriteManagementPanel');
+    var toggle = document.getElementById('favoritePanelToggle');
+    if (!panel || !toggle) return;
+    panel.classList.toggle('open', open);
+    panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+    toggle.classList.toggle('active', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) setLabelPanelOpen(false);
+}
+
+function toggleFavoritePanel() {
+    var panel = document.getElementById('favoriteManagementPanel');
+    setFavoritePanelOpen(!panel || !panel.classList.contains('open'));
+}
+
+function closeFavoritePanel() {
+    setFavoritePanelOpen(false);
+}
 
 function changeTile() {
     var tileType = document.getElementById('tileSelect').value;
@@ -341,10 +382,140 @@ function pathLabelKey(date, segmentIndex) {
 }
 
 function uniqueLabels() {
-    var labels = Object.values(pathLabels)
+    var labels = customLabels.concat(Object.values(pathLabels))
         .map(function(label) { return String(label || '').trim(); })
         .filter(function(label) { return label.length > 0; });
     return Array.from(new Set(labels)).sort();
+}
+
+function persistCustomLabels() {
+    return fetch('/api/custom-labels', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(customLabels)
+    }).catch(function(error) {
+        console.warn('Unable to save custom labels.', error);
+        return false;
+    });
+}
+
+function addCustomLabel(label) {
+    var normalized = String(label || '').trim();
+    if (!normalized) return false;
+    if (customLabels.indexOf(normalized) === -1) {
+        customLabels.push(normalized);
+        customLabels.sort();
+        return true;
+    }
+    return false;
+}
+
+function createCustomLabel() {
+    var input = document.getElementById('labelInput');
+    var label = input ? input.value.trim() : '';
+    if (!label) {
+        if (input) input.focus();
+        return;
+    }
+
+    var changed = addCustomLabel(label);
+    if (input) input.value = '';
+    populateLabelButtons();
+    if (changed) persistCustomLabels();
+}
+
+function refreshLabelRelatedViews() {
+    populateLabelButtons();
+    if (isLabelMode()) {
+        renderLabelMode();
+        return;
+    }
+    setDateControlsDisabled(false);
+    if (allData && currentDate) {
+        populateSegmentButtons(allData[currentDate]);
+        renderFavorites();
+    }
+}
+
+function replaceCustomLabel(oldLabel, newLabel) {
+    customLabels = customLabels
+        .filter(function(label) { return label !== oldLabel; });
+    addCustomLabel(newLabel);
+}
+
+function confirmLabelName(label, message) {
+    var input = window.prompt(message + '\n\n请输入标签名称“' + label + '”确认：');
+    if (input === null) return false;
+    if (input.trim() !== label) {
+        window.alert('标签名称输入不一致，操作已取消。');
+        return false;
+    }
+    return true;
+}
+
+function renameManagedLabel(oldLabel) {
+    var newLabel = window.prompt('输入新的标签名称', oldLabel);
+    if (newLabel === null) return;
+    newLabel = newLabel.trim();
+    if (!newLabel || newLabel === oldLabel) return;
+
+    var renamePathCount = Object.values(pathLabels).filter(function(value) { return value === oldLabel; }).length;
+    var willMerge = uniqueLabels().indexOf(newLabel) !== -1;
+    var renameMessage = renamePathCount > 0
+        ? '即将把标签“' + oldLabel + '”更名为“' + newLabel + '”，并同步更新 ' + renamePathCount + ' 条路径上的该标签。'
+        : '即将把标签“' + oldLabel + '”更名为“' + newLabel + '”。';
+    if (willMerge) {
+        renameMessage += '\n标签“' + newLabel + '”已存在，继续操作会合并到这个标签。';
+    }
+    if (!confirmLabelName(oldLabel, renameMessage)) return;
+
+    replaceCustomLabel(oldLabel, newLabel);
+
+    var changedPathLabels = false;
+    Object.keys(pathLabels).forEach(function(key) {
+        if (pathLabels[key] === oldLabel) {
+            pathLabels[key] = newLabel;
+            changedPathLabels = true;
+        }
+    });
+
+    selectedLabels = selectedLabels
+        .map(function(label) { return label === oldLabel ? newLabel : label; })
+        .filter(function(label, index, labels) { return labels.indexOf(label) === index; })
+        .sort();
+
+    refreshLabelRelatedViews();
+    persistCustomLabels();
+    if (changedPathLabels) persistPathLabels({ allowFallback: false });
+}
+
+function deleteManagedLabel(label) {
+    var wasLabelMode = isLabelMode();
+    var pathCount = Object.values(pathLabels).filter(function(value) { return value === label; }).length;
+    var message = pathCount > 0
+        ? '删除标签“' + label + '”会同时清空 ' + pathCount + ' 条路径上的该标签。'
+        : '即将删除标签“' + label + '”。';
+    if (!confirmLabelName(label, message)) return;
+
+    customLabels = customLabels.filter(function(item) { return item !== label; });
+
+    var changedPathLabels = false;
+    Object.keys(pathLabels).forEach(function(key) {
+        if (pathLabels[key] === label) {
+            delete pathLabels[key];
+            changedPathLabels = true;
+        }
+    });
+
+    selectedLabels = selectedLabels.filter(function(item) { return item !== label; });
+
+    persistCustomLabels();
+    if (changedPathLabels) persistPathLabels({ allowFallback: false });
+    if (wasLabelMode && !isLabelMode()) {
+        clearLabelMode();
+    } else {
+        refreshLabelRelatedViews();
+    }
 }
 
 function isLabelMode() {
@@ -357,19 +528,46 @@ function populateLabelButtons() {
 
     var dateModeButton = document.createElement('button');
     dateModeButton.type = 'button';
-    dateModeButton.className = 'label-button' + (!isLabelMode() ? ' active' : '');
+    dateModeButton.className = 'label-button date-mode-button' + (!isLabelMode() ? ' active' : '');
     dateModeButton.textContent = '日期模式';
     dateModeButton.onclick = function() { clearLabelMode(); };
     grid.appendChild(dateModeButton);
 
     uniqueLabels().forEach(function(label) {
+        var item = document.createElement('div');
+        item.className = 'label-manage-item';
+
         var button = document.createElement('button');
         button.type = 'button';
-        button.className = 'label-button' + (selectedLabels.indexOf(label) !== -1 ? ' active' : '');
+        button.className = 'label-button label-filter-button' + (selectedLabels.indexOf(label) !== -1 ? ' active' : '');
         button.textContent = label;
         button.title = label;
         button.onclick = function() { toggleLabel(label); };
-        grid.appendChild(button);
+
+        var renameButton = document.createElement('button');
+        renameButton.type = 'button';
+        renameButton.className = 'label-action-button';
+        renameButton.textContent = '更名';
+        renameButton.title = '更名标签：' + label;
+        renameButton.onclick = function(event) {
+            event.stopPropagation();
+            renameManagedLabel(label);
+        };
+
+        var deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'label-action-button danger';
+        deleteButton.textContent = '删除';
+        deleteButton.title = '删除标签：' + label;
+        deleteButton.onclick = function(event) {
+            event.stopPropagation();
+            deleteManagedLabel(label);
+        };
+
+        item.appendChild(button);
+        item.appendChild(renameButton);
+        item.appendChild(deleteButton);
+        grid.appendChild(item);
     });
 
     populateQuickLabelButtons();
@@ -467,6 +665,7 @@ function applyLabelToSelectedSegments() {
         return;
     }
     var changed = applyLabelToSegments(label);
+    if (addCustomLabel(label)) persistCustomLabels();
     document.getElementById('labelInput').value = '';
     populateLabelButtons();
     populateSegmentButtons(allData[currentDate]);
@@ -845,7 +1044,7 @@ function changeCalendarMonth(offset) {
 }
 
 function metricLabel(metric) {
-    return '速度路径';
+    return '速度可视化';
 }
 
 function metricValues(data, metric) {
@@ -1275,7 +1474,7 @@ function renderLabelMode() {
 function updateMetricUi(data) {
     var speedButton = document.getElementById('speedToggle');
     var legend = document.getElementById('metricLegend');
-    speedButton.textContent = activeMetric === 'speed' ? '速度路径：开启' : '速度路径：关闭';
+    speedButton.textContent = activeMetric === 'speed' ? '速度可视化：开启' : '速度可视化：关闭';
     speedButton.classList.toggle('active', activeMetric === 'speed');
     legend.classList.toggle('active', activeMetric !== null);
 
@@ -1297,7 +1496,7 @@ function updateMetricUi(data) {
 function updateMetricUiForStats(stats) {
     var speedButton = document.getElementById('speedToggle');
     var legend = document.getElementById('metricLegend');
-    speedButton.textContent = activeMetric === 'speed' ? '速度路径：开启' : '速度路径：关闭';
+    speedButton.textContent = activeMetric === 'speed' ? '速度可视化：开启' : '速度可视化：关闭';
     speedButton.classList.toggle('active', activeMetric === 'speed');
     legend.classList.toggle('active', activeMetric !== null);
 
@@ -1481,12 +1680,14 @@ function populateDateSelector(data) {
 Promise.all([
     fetch('all_dates_points.json').then(response => response.json()),
     fetch('path_labels.json').then(response => response.ok ? response.json() : {}).catch(() => ({})),
-    fetch('path_favorites.json').then(response => response.ok ? response.json() : {}).catch(() => ({}))
+    fetch('path_favorites.json').then(response => response.ok ? response.json() : {}).catch(() => ({})),
+    fetch('custom_labels.json').then(response => response.ok ? response.json() : []).catch(() => [])
 ])
-    .then(([data, labels, favorites]) => {
+    .then(([data, labels, favorites, labelsList]) => {
         allData = data;
         pathLabels = labels || {};
         pathFavorites = favorites || {};
+        customLabels = Array.isArray(labelsList) ? labelsList.map(function(label) { return String(label || '').trim(); }).filter(Boolean) : [];
         updateDimOpacityUi();
         populateDateSelector(data);
         populateLabelButtons();

@@ -9,3 +9,4 @@ path_favorites.json
 .env
 node_modules/
 *.csv
+*.db

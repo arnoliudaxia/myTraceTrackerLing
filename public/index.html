@@ -11,18 +11,14 @@
 <body>
     <div id="map"></div>
     <div class="control-panel">
-        <h2>📍 灵敢足迹可视化</h2>
-        <div class="label-selector">
-            <label>🏷️ 标签:</label>
-            <div id="labelGrid" class="label-grid"></div>
-            <div class="label-editor">
-                <input id="labelInput" type="text" placeholder="给选中路径打标签">
-                <button type="button" onclick="applyLabelToSelectedSegments()">应用</button>
-                <button type="button" onclick="savePathLabels()">保存</button>
+        <div class="panel-header">
+            <h2>📍 灵敢足迹可视化</h2>
+            <div class="panel-actions">
+                <button id="favoritePanelToggle" class="panel-icon-button favorite-toggle" type="button" onclick="toggleFavoritePanel()" title="收藏夹" aria-label="收藏夹" aria-expanded="false">⭐</button>
+                <button id="labelPanelToggle" class="panel-icon-button" type="button" onclick="toggleLabelPanel()" title="标签管理" aria-label="标签管理" aria-expanded="false">🏷️</button>
             </div>
         </div>
         <div id="dateSelectorPanel" class="date-selector">
-            <label>📅 选择日期:</label>
             <div class="calendar">
                 <div class="calendar-header">
                     <button type="button" class="calendar-nav" onclick="changeCalendarMonth(-1)" title="上个月">‹</button>
@@ -99,7 +95,7 @@
             </select>
         </div>
         <div class="coord-info">📌 已启用坐标纠正（国内APP数据→WGS84）</div>
-        <button id="speedToggle" class="mode-button" type="button" onclick="toggleSpeedMode()">速度路径：关闭</button>
+        <button id="speedToggle" class="mode-button" type="button" onclick="toggleSpeedMode()">速度可视化：关闭</button>
         <button id="dataPointToggle" class="mode-button point-toggle" type="button" onclick="toggleDataPoints()">数据点：关闭</button>
         <div class="segment-selector">
             <label>🧭 路径段:</label>
@@ -112,15 +108,6 @@
         <div class="quick-labels">
             <div class="quick-label-title">快捷打标签</div>
             <div id="quickLabelGrid" class="quick-label-grid"></div>
-        </div>
-        <div class="favorite-panel">
-            <label>⭐ 收藏夹:</label>
-            <div class="favorite-editor">
-                <textarea id="favoriteNoteInput" rows="2" placeholder="为选中路径添加备注"></textarea>
-                <button type="button" onclick="favoriteSelectedSegments()">收藏选中路径</button>
-            </div>
-            <div id="favoriteSaveStatus" class="favorite-save-status"></div>
-            <div id="favoriteList" class="favorite-list"></div>
         </div>
         <div class="info-grid">
             <div class="info-item">
@@ -142,6 +129,40 @@
             <div class="info-item">
                 <div class="label">路径段数</div>
                 <div class="value" id="segmentCount">-</div>
+            </div>
+        </div>
+    </div>
+    <div id="favoriteManagementPanel" class="favorite-management-panel" aria-hidden="true">
+        <div class="label-panel-header">
+            <div>
+                <div class="label-panel-title">⭐ 收藏夹</div>
+                <div class="label-panel-subtitle">收藏当前路径或打开已收藏路径</div>
+            </div>
+            <button class="label-panel-close" type="button" onclick="closeFavoritePanel()" title="关闭收藏夹" aria-label="关闭收藏夹">×</button>
+        </div>
+        <div class="favorite-panel">
+            <div class="favorite-editor">
+                <textarea id="favoriteNoteInput" rows="2" placeholder="为选中路径添加备注"></textarea>
+                <button type="button" onclick="favoriteSelectedSegments()">收藏选中路径</button>
+            </div>
+            <div id="favoriteSaveStatus" class="favorite-save-status"></div>
+            <div id="favoriteList" class="favorite-list"></div>
+        </div>
+    </div>
+    <div id="labelManagementPanel" class="label-management-panel" aria-hidden="true">
+        <div class="label-panel-header">
+            <div>
+                <div class="label-panel-title">🏷️ 标签管理</div>
+                <div class="label-panel-subtitle">筛选标签或新建标签</div>
+            </div>
+            <button class="label-panel-close" type="button" onclick="closeLabelPanel()" title="关闭标签管理" aria-label="关闭标签管理">×</button>
+        </div>
+        <div class="label-selector">
+            <label>标签筛选</label>
+            <div id="labelGrid" class="label-grid"></div>
+            <div class="label-editor">
+                <input id="labelInput" type="text" placeholder="新建标签">
+                <button type="button" onclick="createCustomLabel()">新建</button>
             </div>
         </div>
     </div>
