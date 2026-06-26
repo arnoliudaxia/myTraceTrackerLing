@@ -106,7 +106,12 @@
         .favorite-title { font-size:12px; font-weight:bold; color:#6b4b00; word-break:break-word; }
         .favorite-note { margin-top:3px; color:#666; font-size:12px; line-height:1.35; white-space:pre-wrap; word-break:break-word; overflow-wrap:anywhere; }
         .favorite-meta { margin-top:3px; color:#999; font-size:11px; word-break:break-word; }
-        .favorite-delete { width:24px; height:24px; border:1px solid #eadcae; border-radius:4px; background:white; color:#9a3412; cursor:pointer; }
+        .favorite-actions { display:grid; gap:5px; }
+        .favorite-delete, .favorite-image-button { width:24px; height:24px; border:1px solid #eadcae; border-radius:4px; background:white; cursor:pointer; font-size:13px; line-height:1; }
+        .favorite-delete { color:#9a3412; }
+        .favorite-image-button { color:#8a5a00; }
+        .favorite-image-button:hover { border-color:#f59e0b; background:#fff8e5; }
+        .favorite-image-preview { display:block; width:100%; max-height:150px; object-fit:cover; margin-top:6px; border:1px solid #eadcae; border-radius:4px; background:white; }
         .favorite-empty { color:#999; font-size:12px; padding:4px 0; }
         .segment-button.favorited { border-color:#f2c94c; background:#fff8e5; color:#7a5200; }
         .segment-button.active.favorited { background:#f59e0b; border-color:#f59e0b; color:white; }

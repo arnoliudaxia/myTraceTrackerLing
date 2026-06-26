@@ -538,22 +538,22 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === 'GET' && url.pathname === '/all_dates_points.json') {
+  if (req.method === 'GET' && url.pathname === '/api/tracks') {
     send(res, 200, JSON.stringify(getAllData()), 'application/json; charset=utf-8');
     return;
   }
 
-  if (req.method === 'GET' && url.pathname === '/path_labels.json') {
+  if (req.method === 'GET' && url.pathname === '/api/path-labels') {
     send(res, 200, JSON.stringify(getPathLabels()), 'application/json; charset=utf-8');
     return;
   }
 
-  if (req.method === 'GET' && url.pathname === '/path_favorites.json') {
+  if (req.method === 'GET' && url.pathname === '/api/path-favorites') {
     send(res, 200, JSON.stringify(getPathFavorites()), 'application/json; charset=utf-8');
     return;
   }
 
-  if (req.method === 'GET' && url.pathname === '/custom_labels.json') {
+  if (req.method === 'GET' && url.pathname === '/api/custom-labels') {
     send(res, 200, JSON.stringify(getCustomLabels()), 'application/json; charset=utf-8');
     return;
   }

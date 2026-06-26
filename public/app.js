@@ -68,6 +68,7 @@ var currentCorrectedPoints = [];
 var currentSegments = [];
 var selectedSegments = 'all';
 var segmentGapThresholdMs = 60 * 60 * 1000;
+var favoriteImageMaxSize = 640;
 var pathLabelsSaveTimer = null;
 var pathFavoritesSaveTimer = null;
 var availableDates = [];
@@ -713,7 +714,6 @@ function schedulePathLabelsSave() {
 }
 
 async function persistPathLabels(options) {
-    var allowFallback = options && options.allowFallback;
     var content = JSON.stringify(pathLabels, null, 2);
     try {
         var response = await fetch('/api/path-labels', {
@@ -725,36 +725,12 @@ async function persistPathLabels(options) {
             return true;
         }
     } catch (error) {
-        // Fall back to browser-side save below when the Node API is unavailable.
-    }
-
-    if (!allowFallback) {
-        console.warn('Unable to auto-save path_labels.json. Please make sure the Node server is running.');
+        console.warn('Unable to save path labels. Please make sure the Node server is running.', error);
         return false;
     }
 
-    if (window.showSaveFilePicker) {
-        try {
-            var handle = await window.showSaveFilePicker({
-                suggestedName: 'path_labels.json',
-                types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }]
-            });
-            var writable = await handle.createWritable();
-            await writable.write(content);
-            await writable.close();
-            return true;
-        } catch (error) {
-            if (error && error.name === 'AbortError') return false;
-        }
-    }
-    var blob = new Blob([content], { type: 'application/json;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var link = document.createElement('a');
-    link.href = url;
-    link.download = 'path_labels.json';
-    link.click();
-    URL.revokeObjectURL(url);
-    return true;
+    console.warn('Unable to save path labels. HTTP status:', response.status);
+    return false;
 }
 
 async function savePathLabels() {
@@ -762,11 +738,14 @@ async function savePathLabels() {
 }
 
 function normalizeFavorite(entry) {
-    if (!entry) return { note: '', createdAt: '' };
-    if (typeof entry === 'string') return { note: entry, createdAt: '' };
+    if (!entry) return { note: '', createdAt: '', imageMime: '', imageData: '', imageUpdatedAt: '' };
+    if (typeof entry === 'string') return { note: entry, createdAt: '', imageMime: '', imageData: '', imageUpdatedAt: '' };
     return {
         note: String(entry.note || ''),
-        createdAt: String(entry.createdAt || '')
+        createdAt: String(entry.createdAt || ''),
+        imageMime: String(entry.imageMime || ''),
+        imageData: String(entry.imageData || ''),
+        imageUpdatedAt: String(entry.imageUpdatedAt || '')
     };
 }
 
@@ -806,6 +785,89 @@ function confirmFavoriteTitle(title) {
         return false;
     }
     return true;
+}
+
+function favoriteImageMime(file) {
+    if (['image/svg+xml', 'image/jpeg', 'image/png'].indexOf(file.type) !== -1) return file.type;
+    var name = String(file.name || '').toLowerCase();
+    if (name.endsWith('.svg')) return 'image/svg+xml';
+    if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
+    if (name.endsWith('.png')) return 'image/png';
+    return '';
+}
+
+function resizeFavoriteImage(file) {
+    return new Promise(function(resolve, reject) {
+        var sourceMime = file ? favoriteImageMime(file) : '';
+        if (!file || !sourceMime) {
+            reject(new Error('请选择 SVG、JPG 或 PNG 图片'));
+            return;
+        }
+
+        var image = new Image();
+        var objectUrl = URL.createObjectURL(file);
+        image.onload = function() {
+            URL.revokeObjectURL(objectUrl);
+            var sourceWidth = image.naturalWidth || image.width;
+            var sourceHeight = image.naturalHeight || image.height;
+            if (!sourceWidth || !sourceHeight) {
+                reject(new Error('无法识别图片尺寸'));
+                return;
+            }
+            var scale = Math.min(1, favoriteImageMaxSize / Math.max(sourceWidth, sourceHeight));
+            var width = Math.max(1, Math.round(sourceWidth * scale));
+            var height = Math.max(1, Math.round(sourceHeight * scale));
+            var canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            var context = canvas.getContext('2d');
+            context.clearRect(0, 0, width, height);
+            context.drawImage(image, 0, 0, width, height);
+
+            var outputMime = sourceMime === 'image/jpeg' ? 'image/jpeg' : 'image/png';
+            var dataUrl = outputMime === 'image/jpeg'
+                ? canvas.toDataURL(outputMime, 0.82)
+                : canvas.toDataURL(outputMime);
+            resolve({
+                imageMime: outputMime,
+                imageData: dataUrl,
+                imageUpdatedAt: new Date().toISOString()
+            });
+        };
+        image.onerror = function() {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error('图片读取失败'));
+        };
+        image.src = objectUrl;
+    });
+}
+
+function uploadFavoriteImage(key, title) {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/svg+xml,image/jpeg,image/png,.svg,.jpg,.jpeg,.png';
+    input.onchange = async function() {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        try {
+            setFavoriteSaveStatus('正在处理图片...', '');
+            var image = await resizeFavoriteImage(file);
+            var favorite = normalizeFavorite(pathFavorites[key]);
+            pathFavorites[key] = {
+                note: favorite.note,
+                createdAt: favorite.createdAt || new Date().toISOString(),
+                imageMime: image.imageMime,
+                imageData: image.imageData,
+                imageUpdatedAt: image.imageUpdatedAt
+            };
+            renderFavorites();
+            await persistPathFavorites({ showStatus: true });
+        } catch (error) {
+            setFavoriteSaveStatus(error.message || '图片上传失败', 'error');
+            window.alert((title ? title + '：' : '') + (error.message || '图片上传失败'));
+        }
+    };
+    input.click();
 }
 
 function renderFavorites() {
@@ -852,6 +914,17 @@ function renderFavorites() {
         meta.textContent = favoriteMeta(date, segmentIndex);
         openButton.appendChild(meta);
 
+        if (favorite.imageData) {
+            var image = document.createElement('img');
+            image.className = 'favorite-image-preview';
+            image.src = favorite.imageData;
+            image.alt = favoriteTitleText;
+            openButton.appendChild(image);
+        }
+
+        var actions = document.createElement('div');
+        actions.className = 'favorite-actions';
+
         var deleteButton = document.createElement('button');
         deleteButton.type = 'button';
         deleteButton.className = 'favorite-delete';
@@ -867,8 +940,20 @@ function renderFavorites() {
             persistPathFavorites({ showStatus: true });
         };
 
+        var imageButton = document.createElement('button');
+        imageButton.type = 'button';
+        imageButton.className = 'favorite-image-button';
+        imageButton.title = favorite.imageData ? '更换图片' : '上传图片';
+        imageButton.textContent = '🖼️';
+        imageButton.onclick = function(event) {
+            event.stopPropagation();
+            uploadFavoriteImage(key, favoriteTitleText);
+        };
+
         item.appendChild(openButton);
-        item.appendChild(deleteButton);
+        actions.appendChild(deleteButton);
+        actions.appendChild(imageButton);
+        item.appendChild(actions);
         list.appendChild(item);
     });
 }
@@ -894,7 +979,10 @@ async function favoriteSelectedSegments() {
         if (previous.note !== note || !pathFavorites[key]) {
             pathFavorites[key] = {
                 note: note,
-                createdAt: previous.createdAt || createdAt
+                createdAt: previous.createdAt || createdAt,
+                imageMime: previous.imageMime,
+                imageData: previous.imageData,
+                imageUpdatedAt: previous.imageUpdatedAt
             };
             changed = true;
         }
@@ -957,11 +1045,11 @@ async function persistPathFavorites(options) {
             return true;
         }
         if (showStatus) setFavoriteSaveStatus('收藏保存失败：请重启 Node 服务后重试', 'error');
-        console.warn('Unable to save path_favorites.json. HTTP status:', response.status);
+        console.warn('Unable to save path favorites. HTTP status:', response.status);
         return false;
     } catch (error) {
         if (showStatus) setFavoriteSaveStatus('收藏保存失败：请确认正在通过 npm start 打开页面', 'error');
-        console.warn('Unable to auto-save path_favorites.json. Please make sure the Node server is running.');
+        console.warn('Unable to save path favorites. Please make sure the Node server is running.');
         return false;
     }
 }
@@ -1688,12 +1776,12 @@ function populateDateSelector(data) {
     }
 }
 
-// 加载JSON数据
+// 加载应用数据
 Promise.all([
-    fetch('all_dates_points.json').then(response => response.json()),
-    fetch('path_labels.json').then(response => response.ok ? response.json() : {}).catch(() => ({})),
-    fetch('path_favorites.json').then(response => response.ok ? response.json() : {}).catch(() => ({})),
-    fetch('custom_labels.json').then(response => response.ok ? response.json() : []).catch(() => [])
+    fetch('/api/tracks').then(response => response.json()),
+    fetch('/api/path-labels').then(response => response.ok ? response.json() : {}).catch(() => ({})),
+    fetch('/api/path-favorites').then(response => response.ok ? response.json() : {}).catch(() => ({})),
+    fetch('/api/custom-labels').then(response => response.ok ? response.json() : []).catch(() => [])
 ])
     .then(([data, labels, favorites, labelsList]) => {
         allData = data;
@@ -1707,8 +1795,8 @@ Promise.all([
         loadTrack(document.getElementById('dateSelect').value);
     })
     .catch(error => {
-        console.error('Error loading JSON:', error);
-        alert('加载数据失败，请确保all_dates_points.json文件存在！');
+        console.error('Error loading app data:', error);
+        alert('加载数据失败，请确认 Node 服务正在运行。');
     });
 
 L.control.scale({ imperial:false }).addTo(map);
