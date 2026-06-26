@@ -85,6 +85,7 @@ function setLabelPanelOpen(open) {
     var toggle = document.getElementById('labelPanelToggle');
     if (!panel || !toggle) return;
     if (open) setFavoritePanelOpen(false);
+    if (open) setSettingsPanelOpen(false);
     panel.classList.toggle('open', open);
     panel.setAttribute('aria-hidden', open ? 'false' : 'true');
     toggle.classList.toggle('active', open);
@@ -109,6 +110,7 @@ function setFavoritePanelOpen(open) {
     toggle.classList.toggle('active', open);
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     if (open) setLabelPanelOpen(false);
+    if (open) setSettingsPanelOpen(false);
 }
 
 function toggleFavoritePanel() {
@@ -118,6 +120,78 @@ function toggleFavoritePanel() {
 
 function closeFavoritePanel() {
     setFavoritePanelOpen(false);
+}
+
+function setSettingsPanelOpen(open) {
+    var panel = document.getElementById('settingsPanel');
+    var toggle = document.getElementById('settingsPanelToggle');
+    if (!panel || !toggle) return;
+    panel.classList.toggle('open', open);
+    panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+    toggle.classList.toggle('active', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) setLabelPanelOpen(false);
+    if (open) setFavoritePanelOpen(false);
+}
+
+function toggleSettingsPanel() {
+    var panel = document.getElementById('settingsPanel');
+    setSettingsPanelOpen(!panel || !panel.classList.contains('open'));
+}
+
+function closeSettingsPanel() {
+    setSettingsPanelOpen(false);
+}
+
+function setDatabaseSettingsStatus(message, type) {
+    var status = document.getElementById('databaseSettingsStatus');
+    if (!status) return;
+    status.textContent = message || '';
+    status.className = 'settings-status' + (type ? ' ' + type : '');
+}
+
+function exportDatabase() {
+    setDatabaseSettingsStatus('正在导出数据库...', '');
+    window.location.href = '/api/database/download';
+    setTimeout(function() {
+        setDatabaseSettingsStatus('已开始下载 DB', 'saved');
+    }, 300);
+}
+
+function uploadDatabase() {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.db,.sqlite,.sqlite3,application/octet-stream';
+    input.onchange = async function() {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        var confirmed = window.prompt('上传 DB 会替换当前数据库，服务会先自动备份现有 data.db。\n\n请输入文件名“' + file.name + '”确认上传：');
+        if (confirmed === null) return;
+        if (confirmed.trim() !== file.name) {
+            window.alert('文件名输入不一致，上传已取消。');
+            return;
+        }
+
+        try {
+            setDatabaseSettingsStatus('正在上传并替换数据库...', '');
+            var response = await fetch('/api/database/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/octet-stream' },
+                body: await file.arrayBuffer()
+            });
+            var payload = await response.json().catch(function() { return {}; });
+            if (!response.ok) {
+                throw new Error(payload.error || '上传失败');
+            }
+            setDatabaseSettingsStatus('DB 已上传，正在刷新页面...', 'saved');
+            window.alert('DB 上传成功。现有数据库已备份为：' + (payload.backup || '未生成备份'));
+            window.location.reload();
+        } catch (error) {
+            setDatabaseSettingsStatus(error.message || 'DB 上传失败', 'error');
+            window.alert(error.message || 'DB 上传失败');
+        }
+    };
+    input.click();
 }
 
 function changeTile() {

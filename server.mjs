@@ -4,6 +4,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   initDatabase,
+  closeDatabase,
+  DB_FILE,
   getAllData,
   getPathLabels,
   getPathFavorites,
@@ -76,6 +78,23 @@ async function readBody(req) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
+async function readBinaryBody(req, maxBytes = 200 * 1024 * 1024) {
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of req) {
+    total += chunk.length;
+    if (total > maxBytes) {
+      throw new Error('上传文件过大');
+    }
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
+function timestampForFile() {
+  return new Date().toISOString().replace(/[:.]/g, '-');
+}
+
 async function handlePathLabelsSave(req, res) {
   try {
     const body = await readBody(req);
@@ -117,6 +136,57 @@ async function handleCustomLabelsSave(req, res) {
     setCustomLabels(labels);
     send(res, 200, JSON.stringify({ ok: true }), 'application/json; charset=utf-8');
   } catch (error) {
+    send(res, 400, JSON.stringify({ error: error.message }), 'application/json; charset=utf-8');
+  }
+}
+
+function handleDatabaseDownload(req, res) {
+  if (!fs.existsSync(DB_FILE)) {
+    send(res, 404, JSON.stringify({ error: '数据库文件不存在' }), 'application/json; charset=utf-8');
+    return;
+  }
+
+  const filename = `linggan-footprints-${timestampForFile()}.db`;
+  res.writeHead(200, {
+    'Content-Type': 'application/octet-stream',
+    'Content-Disposition': `attachment; filename="${filename}"`,
+    'Content-Length': fs.statSync(DB_FILE).size,
+    'Cache-Control': 'no-store',
+  });
+  fs.createReadStream(DB_FILE).pipe(res);
+}
+
+async function handleDatabaseUpload(req, res) {
+  let backupPath = '';
+  let tempPath = '';
+  try {
+    const body = await readBinaryBody(req);
+    const sqliteHeader = Buffer.from('SQLite format 3\0', 'ascii');
+    if (body.length < sqliteHeader.length || !body.subarray(0, sqliteHeader.length).equals(sqliteHeader)) {
+      send(res, 400, JSON.stringify({ error: '上传文件不是有效的 SQLite 数据库' }), 'application/json; charset=utf-8');
+      return;
+    }
+
+    closeDatabase();
+    backupPath = `${DB_FILE}.${timestampForFile()}.backup`;
+    tempPath = `${DB_FILE}.${process.pid}.upload`;
+    if (fs.existsSync(DB_FILE)) fs.copyFileSync(DB_FILE, backupPath);
+    fs.writeFileSync(tempPath, body);
+    fs.copyFileSync(tempPath, DB_FILE);
+    fs.rmSync(tempPath, { force: true });
+    initDatabase();
+
+    send(res, 200, JSON.stringify({
+      ok: true,
+      backup: backupPath ? path.basename(backupPath) : '',
+    }), 'application/json; charset=utf-8');
+  } catch (error) {
+    if (tempPath) fs.rmSync(tempPath, { force: true });
+    try {
+      initDatabase();
+    } catch {
+      // Keep the original upload error as the response.
+    }
     send(res, 400, JSON.stringify({ error: error.message }), 'application/json; charset=utf-8');
   }
 }
@@ -505,6 +575,16 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'POST' && url.pathname === '/api/custom-labels') {
     await handleCustomLabelsSave(req, res);
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/database/download') {
+    handleDatabaseDownload(req, res);
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/database/upload') {
+    await handleDatabaseUpload(req, res);
     return;
   }
 

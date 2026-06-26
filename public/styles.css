@@ -8,10 +8,12 @@
         .panel-actions { display:flex; align-items:center; gap:8px; flex:0 0 auto; }
         .panel-icon-button { width:34px; height:34px; flex:0 0 auto; border:1px solid #ddd6fe; border-radius:8px; background:#faf5ff; color:#6d28d9; font-size:17px; line-height:1; font-family:"Microsoft YaHei",Arial,sans-serif; cursor:pointer; box-shadow:0 1px 4px rgba(109,40,217,0.14); }
         .panel-icon-button:hover, .panel-icon-button.active { border-color:#7c3aed; background:#7c3aed; color:white; }
+        .settings-toggle { border-color:#bfdbfe; background:#eff6ff; color:#1d4ed8; }
+        .settings-toggle:hover, .settings-toggle.active { border-color:#2563eb; background:#2563eb; color:white; }
         .favorite-toggle { border-color:#fde68a; background:#fff8e5; color:#8a5a00; }
         .favorite-toggle:hover, .favorite-toggle.active { border-color:#f59e0b; background:#f59e0b; color:white; }
-        .label-management-panel, .favorite-management-panel { position:fixed; top:10px; left:360px; width:300px; max-width:calc(100vw - 380px); max-height:calc(100vh - 20px); overflow-y:auto; background:white; padding:14px; border-radius:8px; box-shadow:0 2px 15px rgba(0,0,0,0.3); z-index:1000; transform:translateX(-10px); opacity:0; pointer-events:none; transition:opacity 0.18s ease, transform 0.18s ease; box-sizing:border-box; }
-        .label-management-panel.open, .favorite-management-panel.open { transform:translateX(0); opacity:1; pointer-events:auto; }
+        .label-management-panel, .favorite-management-panel, .settings-panel { position:fixed; top:10px; left:360px; width:300px; max-width:calc(100vw - 380px); max-height:calc(100vh - 20px); overflow-y:auto; background:white; padding:14px; border-radius:8px; box-shadow:0 2px 15px rgba(0,0,0,0.3); z-index:1000; transform:translateX(-10px); opacity:0; pointer-events:none; transition:opacity 0.18s ease, transform 0.18s ease; box-sizing:border-box; }
+        .label-management-panel.open, .favorite-management-panel.open, .settings-panel.open { transform:translateX(0); opacity:1; pointer-events:auto; }
         .label-panel-header { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid #eee; }
         .label-panel-title { color:#333; font-size:16px; font-weight:bold; }
         .label-panel-subtitle { margin-top:3px; color:#888; font-size:11px; line-height:1.4; }
@@ -113,6 +115,12 @@
         .favorite-image-button:hover { border-color:#f59e0b; background:#fff8e5; }
         .favorite-image-preview { display:block; width:100%; max-height:150px; object-fit:cover; margin-top:6px; border:1px solid #eadcae; border-radius:4px; background:white; }
         .favorite-empty { color:#999; font-size:12px; padding:4px 0; }
+        .settings-content { display:grid; gap:8px; }
+        .settings-action-button { width:100%; padding:8px; border:1px solid #ccd6e0; border-radius:4px; background:#f8fbff; color:#2c5c86; font-size:13px; font-family:"Microsoft YaHei",Arial,sans-serif; cursor:pointer; }
+        .settings-action-button:hover { border-color:#2563eb; color:#1d4ed8; background:#eff6ff; }
+        .settings-status { min-height:16px; color:#777; font-size:11px; line-height:1.4; }
+        .settings-status.error { color:#b42318; }
+        .settings-status.saved { color:#166534; }
         .segment-button.favorited { border-color:#f2c94c; background:#fff8e5; color:#7a5200; }
         .segment-button.active.favorited { background:#f59e0b; border-color:#f59e0b; color:white; }
         .mode-button { width:100%; margin-top:10px; padding:8px; border:1px solid #ccd6e0; border-radius:4px; background:#f8fbff; color:#2c5c86; font-size:13px; font-family:"Microsoft YaHei",Arial,sans-serif; cursor:pointer; }
@@ -127,5 +135,5 @@
         .calendar-day.available.favorited:hover { background:#fff0cc; }
         .calendar-day.active.favorited { background:#3388ff; border-color:#3388ff; color:white; }
         @media (max-width: 760px) {
-            .label-management-panel, .favorite-management-panel { top:72px; left:10px; right:10px; width:auto; max-width:none; }
+            .label-management-panel, .favorite-management-panel, .settings-panel { top:72px; left:10px; right:10px; width:auto; max-width:none; }
         }
