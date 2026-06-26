@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { initDatabase, replaceTracks, DB_FILE } from '../lib/db.mjs';
+import { initDatabase, replaceTracks, getExistingTrackDates, DB_FILE } from '../lib/db.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -225,11 +225,19 @@ function buildDayData(segments) {
 
 function generate(inputCsvPath) {
   const csvPath = path.resolve(inputCsvPath);
+  initDatabase();
+  const existingDates = new Set(getExistingTrackDates());
+  const incrementalMode = existingDates.size > 0;
   const rows = readCsvObjects(csvPath);
   const grouped = new Map();
+  let skippedRows = 0;
 
   for (const row of rows) {
     const date = ensureDate(row);
+    if (incrementalMode && existingDates.has(date)) {
+      skippedRows++;
+      continue;
+    }
     if (!grouped.has(date)) grouped.set(date, []);
     grouped.get(date).push(row);
   }
@@ -246,11 +254,14 @@ function generate(inputCsvPath) {
     allData[date] = buildDayData(segments);
   }
 
-  initDatabase();
   replaceTracks(allData);
 
   const latestDate = Object.keys(allData).sort().at(-1);
   const totalRecords = Object.values(allData).reduce((sum, day) => sum + day.count, 0);
+  if (incrementalMode) {
+    console.log(`Incremental mode: existing database has ${existingDates.size} dates; importing only missing dates.`);
+    console.log(`Skipped CSV rows from existing dates: ${skippedRows}`);
+  }
   console.log(`完成！生成了 ${Object.keys(allData).length} 个日期的数据`);
   console.log(`输入文件: ${csvPath}`);
   console.log(`总记录数: ${totalRecords}`);

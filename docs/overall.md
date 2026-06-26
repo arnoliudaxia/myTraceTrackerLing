@@ -196,7 +196,9 @@ npm run generate -- "灵敢足迹.csv"
 5. 合并跨天但时间连续的路径段。
 6. 生成每日轨迹汇总结构。
 7. 初始化 SQLite 数据库。
-8. 调用 `replaceTracks()` 写入 `tracks` 和 `track_points`。
+8. 读取数据库中已有轨迹日期。
+9. 如果数据库已有非空轨迹，只保留 CSV 中数据库完全不存在的日期。
+10. 调用 `replaceTracks()` 写入 `tracks` 和 `track_points`。
 
 #### 读取字段
 
@@ -292,10 +294,20 @@ npm run generate -- "灵敢足迹.csv"
 
 #### 写入数据库
 
-脚本最后调用：
+脚本会先调用：
 
 ```javascript
 initDatabase();
+getExistingTrackDates();
+```
+
+如果数据库中已经有轨迹日期，脚本进入增量导入模式：CSV 中属于已有日期的行会被跳过，只有数据库完全不存在的日期才会进入生成流程。
+
+这样可以避免重写已有日期的轨迹点，从而保护基于 `日期#路径段索引` 的标签、收藏和收藏图片关联。
+
+随后调用：
+
+```javascript
 replaceTracks(allData);
 ```
 
@@ -306,7 +318,7 @@ replaceTracks(allData);
 - `tracks`
 - `track_points`
 
-注意：`generate-data.mjs` 只替换轨迹数据，不负责管理标签、收藏和自定义标签。这些用户数据由前端操作通过 API 写入数据库。
+注意：`generate-data.mjs` 只写入轨迹数据，不负责管理标签、收藏和自定义标签。这些用户数据由前端操作通过 API 写入数据库。已有非空数据库下，脚本不会更新已有日期，即使新 CSV 中包含同一日期的更多点，也会跳过该日期。
 
 ### `filter-csv-days.mjs`
 
@@ -360,6 +372,7 @@ npm run filter -- "灵敢足迹.csv" -o "灵敢足迹_filtered.csv" --threshold 
 - `initDatabase()`
 - `closeDatabase()`
 - `getAllData()`
+- `getExistingTrackDates()`
 - `getPathLabels()`
 - `setPathLabels()`
 - `getPathFavorites()`
