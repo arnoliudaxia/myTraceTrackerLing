@@ -843,11 +843,23 @@ function favoriteMeta(date, segmentIndex) {
     return count + ' 个点 · ' + startTime + ' - ' + endTime;
 }
 
+function favoriteRouteTimestamp(key) {
+    var parts = key.split('#');
+    var date = parts[0];
+    var segmentIndex = parseInt(parts[1], 10);
+    var data = allData ? allData[date] : null;
+    if (!data) return Date.parse(date) || 0;
+    var segment = buildSegments(data)[segmentIndex];
+    if (!segment) return Date.parse(date) || 0;
+    var timestamp = data.timestamps && data.timestamps[segment.start];
+    return Number.isFinite(timestamp) ? timestamp : (Date.parse(date) || 0);
+}
+
 function favoriteKeys() {
     return Object.keys(pathFavorites).sort(function(a, b) {
-        var favA = normalizeFavorite(pathFavorites[a]);
-        var favB = normalizeFavorite(pathFavorites[b]);
-        return (favB.createdAt || b).localeCompare(favA.createdAt || a);
+        var timeDiff = favoriteRouteTimestamp(b) - favoriteRouteTimestamp(a);
+        if (timeDiff !== 0) return timeDiff;
+        return b.localeCompare(a);
     });
 }
 
@@ -1311,8 +1323,11 @@ function updateInfoCards(data) {
     var stats = currentSelectionStats(data);
     document.getElementById('pointCount').textContent = stats.count + ' 个点';
     document.getElementById('timeRange').textContent = stats.startTime + ' - ' + stats.endTime;
-    document.getElementById('altitudeRange').textContent =
-        stats.altitude.min === null || stats.altitude.max === null ? '-' : formatAltitude(stats.altitude.min) + ' - ' + formatAltitude(stats.altitude.max);
+    var altitudeRange = document.getElementById('altitudeRange');
+    if (altitudeRange) {
+        altitudeRange.textContent =
+            stats.altitude.min === null || stats.altitude.max === null ? '-' : formatAltitude(stats.altitude.min) + ' - ' + formatAltitude(stats.altitude.max);
+    }
     document.getElementById('speedRange').textContent =
         stats.speed.min === null || stats.speed.max === null ? '-' : formatSpeed(stats.speed.min) + ' - ' + formatSpeed(stats.speed.max);
     document.getElementById('segmentCount').textContent =
@@ -1546,8 +1561,11 @@ function labelModeStats(refs) {
 function updateLabelModeInfoCards(stats) {
     document.getElementById('pointCount').textContent = stats.count + ' 个点';
     document.getElementById('timeRange').textContent = stats.startTime + ' - ' + stats.endTime;
-    document.getElementById('altitudeRange').textContent =
-        stats.altitude.min === null || stats.altitude.max === null ? '-' : formatAltitude(stats.altitude.min) + ' - ' + formatAltitude(stats.altitude.max);
+    var altitudeRange = document.getElementById('altitudeRange');
+    if (altitudeRange) {
+        altitudeRange.textContent =
+            stats.altitude.min === null || stats.altitude.max === null ? '-' : formatAltitude(stats.altitude.min) + ' - ' + formatAltitude(stats.altitude.max);
+    }
     document.getElementById('speedRange').textContent =
         stats.speed.min === null || stats.speed.max === null ? '-' : formatSpeed(stats.speed.min) + ' - ' + formatSpeed(stats.speed.max);
     document.getElementById('segmentCount').textContent = stats.pathCount + ' 条';
