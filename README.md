@@ -11,13 +11,10 @@ APP的足迹记录的功能挺不错的，但是足迹多了之后管理可视�
 ## ✨ 功能特性
 
 - **📅 日期选择**：通过日历视图选择不同日期查看当天的移动轨迹，仅有轨迹数据的日期可点击
-- **🗺️ 地图源切换**：支持 OpenStreetMap、卫星地图-Esri World Imagery 和卫星地图-天地图
-- **📍 轨迹展示**：用蓝色线条连接同一天内的所有轨迹点
-- **🧭 路径分段**：按相邻轨迹点时间差自动区分连续路径和断开路径，支持跨天连续路径合并
+- **🗺️ 地图源切换**：支持 OpenStreetMap、Esri World Imagery、天地图、星图地球、Tracestrack
+- **📍 轨迹展示**：将离散的轨迹点聚类成轨迹并可视化
 - **🏷️ 路径标签**：可为路径段添加标签，支持复用已有标签快速打标，并跨不同日期同时显示同一标签的路径
 - **⭐ 路径收藏**：可收藏当前选中的路径段，为收藏路径添加文字备注，并在收藏夹中快速回到对应路径
-- **🟢 起点标记**：绿色圆点标记当天第一个轨迹点
-- **🔴 终点标记**：红色圆点标记当天最后一个轨迹点
 - **📊 信息面板**：显示当前日期的轨迹点数和时间段
 - **⚪ 数据点显示**：可切换显示原始轨迹点，并跟随日期、路径段和标签模式变化
 - **🏃 速度路径**：通过按钮切换速度可视化，用连续渐变路径显示当前日期轨迹的速度变化
@@ -47,7 +44,6 @@ APP的足迹记录的功能挺不错的，但是足迹多了之后管理可视�
 - `scripts/filter-csv-days.mjs` - 按每天数据点数量清洗 CSV 的 Node 脚本
 - `scripts/generate-data.mjs` - 从命令行传入的 CSV 生成 `data.db` 轨迹数据的 Node 脚本
 - `scripts/migrate-json-to-sqlite.mjs` - 将旧版 JSON 数据一次性迁移到 SQLite 的脚本
-- `filter_csv_days.py` / `generate_map_working.py` - 旧版 Python 脚本（保留）
 - `package.json` - Node 项目入口和 npm scripts
 
 ## 🚀 使用方法
@@ -66,7 +62,7 @@ APP的足迹记录的功能挺不错的，但是足迹多了之后管理可视�
 如需先独立清洗 CSV，可运行：
 
 ```bash
-npm run filter -- "灵敢足迹(2020.06.25-2026.05.01).csv" --in-place
+npm run filter -- "灵敢足迹.csv" --in-place
 ```
 
 清洗规则：按 `dayTime` 分组，如果某一天的数据点数量不超过阈值，则删除这一天的全部记录。默认阈值为 10。脚本只复制保留下来的原始行文本，不会重新格式化 CSV 字段、数字精度或引号。
@@ -74,13 +70,13 @@ npm run filter -- "灵敢足迹(2020.06.25-2026.05.01).csv" --in-place
 可以通过 `--threshold` 调整阈值，例如删除每天数据点数量不超过 20 个的日期：
 
 ```bash
-npm run filter -- "灵敢足迹(2020.06.25-2026.05.01).csv" --in-place --threshold 20
+npm run filter -- "灵敢足迹.csv" --in-place --threshold 20
 ```
 
 如果不想覆盖原文件，可以输出到新文件：
 
 ```bash
-npm run filter -- "灵敢足迹(2020.06.25-2026.05.01).csv" -o "灵敢足迹_filtered.csv" --threshold 10
+npm run filter -- "灵敢足迹.csv" -o "灵敢足迹_filtered.csv" --threshold 10
 ```
 
 ### 3. 生成数据
@@ -88,7 +84,7 @@ npm run filter -- "灵敢足迹(2020.06.25-2026.05.01).csv" -o "灵敢足迹_fil
 运行 Node 脚本生成数据：
 
 ```bash
-npm run generate -- "灵敢足迹(2020.06.25-2026.05.01).csv"
+npm run generate -- "灵敢足迹.csv"
 ```
 
 脚本会：
@@ -109,18 +105,22 @@ npm start
 http://localhost:3000
 ```
 
-Node 服务会托管 `public/` 前端文件，并从 `data.db` SQLite 数据库提供轨迹数据、标签、收藏，同时提供标签保存接口、收藏保存接口和天地图瓦片代理接口。
+Node 服务会托管 `public/` 前端文件，并从 `data.db` SQLite 数据库提供轨迹数据、标签、收藏，同时提供标签保存接口、收藏保存接口和瓦片代理接口。
 
-如果需要使用“卫星地图-天地图”，在项目根目录创建 `.env` 并填写天地图 Key：
+### 5. 数据
 
-```env
-TIANDITU_KEY=你的天地图Key
-```
+有些瓦片服务需要申请API key，填入`.env`。
 
-然后正常启动：
 
-```bash
-npm start
+数据链路是：
+
+```text
+CSV 原始轨迹
+  -> scripts/filter-csv-days.mjs 清洗低质量日期
+  -> scripts/generate-data.mjs 解析、分组、分段、跨天合并
+  -> lib/db.mjs 写入 data.db
+  -> server.mjs 提供 JSON API
+  -> public/app.js 拉取并绘制地图
 ```
 
 ### 5. 操作说明
@@ -165,8 +165,8 @@ correctedLng = lng - dLng;
 
 - **规则**：如果某天的轨迹点不超过指定阈值，则认为该天没有有效数据；默认阈值为 10，可通过 `--threshold` 修改
 - **目的**：避免稀疏数据点造成轨迹断裂或误导
-- **清洗脚本**：`filter_csv_days.py` 可直接覆盖原始 CSV，并保留原始数据行格式
-- **生成脚本**：`generate_map_working.py` 不再依赖 `date` 字段；缺少该字段时会从 `dayTime` 或 `geoTime` 计算
+- **清洗脚本**：`scripts/filter-csv-days.mjs` 可直接覆盖原始 CSV，并保留原始数据行格式
+- **生成脚本**：`scripts/generate-data.mjs` 不再依赖 `date` 字段；缺少该字段时会从 `dayTime` 或 `geoTime` 计算
 
 ### 速度路径可视化
 
@@ -275,7 +275,7 @@ correctedLng = lng - dLng;
 
 ### Q: 如何修改坐标纠正算法？
 
-**A**: 编辑 `灵敢足迹_轨迹可视化.html` 文件中的 `correctCoord()` 函数。
+**A**: 编辑 `public/app.js` 文件中的 `correctCoord()` 函数。
 
 ## 📝 更新日志
 
@@ -296,8 +296,8 @@ correctedLng = lng - dLng;
 - ✅ 数据外部化，提升页面加载速度
 - ✅ 默认选中最新日期
 - ✅ 修复时间格式显示问题
-- ✅ 新增 `filter_csv_days.py`，支持按每天数据点数量清洗 CSV
-- ✅ 更新 `generate_map_working.py`，支持在没有 `date` 字段时自动计算日期
+- ✅ 新增 CSV 清洗流程，支持按每天数据点数量清洗 CSV
+- ✅ 更新数据生成流程，支持在没有 `date` 字段时自动计算日期
 - ✅ 新增速度路径按钮，支持按渐变路径颜色查看速度快慢变化
 - ✅ 新增按时间差自动切分路径段，并支持按钮网格多选突出显示
 - ✅ 路径标签迁移到 SQLite 数据库，支持跨日期按标签显示路径
@@ -315,3 +315,7 @@ correctedLng = lng - dLng;
 - [OpenStreetMap](https://www.openstreetmap.org/) - 提供地图瓦片服务
 - Esri World Imagery - 提供卫星地图瓦片服务
 - [天地图地图服务](http://lbs.tianditu.gov.cn/server/MapService.html) - 提供 WMTS 影像底图和影像注记服务
+
+## TODO
+
+[] 照片关联——将照片和足迹点进行关联，并可视化
