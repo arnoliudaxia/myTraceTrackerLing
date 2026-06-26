@@ -798,6 +798,16 @@ function favoriteKeys() {
     });
 }
 
+function confirmFavoriteTitle(title) {
+    var input = window.prompt('即将取消收藏“' + title + '”。\n\n请输入收藏标题“' + title + '”确认：');
+    if (input === null) return false;
+    if (input.trim() !== title) {
+        window.alert('收藏标题输入不一致，操作已取消。');
+        return false;
+    }
+    return true;
+}
+
 function renderFavorites() {
     var list = document.getElementById('favoriteList');
     if (!list) return;
@@ -826,9 +836,10 @@ function renderFavorites() {
         openButton.className = 'favorite-open';
         openButton.onclick = function() { openFavoritePath(key); };
 
+        var favoriteTitleText = favoriteTitle(date, segmentIndex);
         var title = document.createElement('div');
         title.className = 'favorite-title';
-        title.textContent = favoriteTitle(date, segmentIndex);
+        title.textContent = favoriteTitleText;
         openButton.appendChild(title);
 
         var note = document.createElement('div');
@@ -848,6 +859,7 @@ function renderFavorites() {
         deleteButton.textContent = '×';
         deleteButton.onclick = function(event) {
             event.stopPropagation();
+            if (!confirmFavoriteTitle(favoriteTitleText)) return;
             delete pathFavorites[key];
             renderFavorites();
             renderDateCalendar();
