@@ -1,14 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { initDatabase, replaceTracks, DB_FILE } from '../lib/db.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
-const JSON_FILE = path.join(rootDir, 'all_dates_points.json');
-const PATH_LABELS_FILE = path.join(rootDir, 'path_labels.json');
-const PATH_FAVORITES_FILE = path.join(rootDir, 'path_favorites.json');
 const TIME_ZONE = 'Asia/Shanghai';
 const PATH_GAP_THRESHOLD_MS = 60 * 60 * 1000;
 
@@ -248,13 +246,8 @@ function generate(inputCsvPath) {
     allData[date] = buildDayData(segments);
   }
 
-  fs.writeFileSync(JSON_FILE, `${JSON.stringify(allData, null, 2)}\n`, 'utf8');
-  if (!fs.existsSync(PATH_LABELS_FILE)) {
-    fs.writeFileSync(PATH_LABELS_FILE, '{}\n', 'utf8');
-  }
-  if (!fs.existsSync(PATH_FAVORITES_FILE)) {
-    fs.writeFileSync(PATH_FAVORITES_FILE, '{}\n', 'utf8');
-  }
+  initDatabase();
+  replaceTracks(allData);
 
   const latestDate = Object.keys(allData).sort().at(-1);
   const totalRecords = Object.values(allData).reduce((sum, day) => sum + day.count, 0);
@@ -262,9 +255,7 @@ function generate(inputCsvPath) {
   console.log(`输入文件: ${csvPath}`);
   console.log(`总记录数: ${totalRecords}`);
   console.log(`最新日期: ${latestDate} (默认选中)`);
-  console.log(`数据文件: ${JSON_FILE}`);
-  console.log(`标签文件: ${PATH_LABELS_FILE}`);
-  console.log(`收藏文件: ${PATH_FAVORITES_FILE}`);
+  console.log(`数据库文件: ${DB_FILE}`);
 }
 
 try {

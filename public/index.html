@@ -21,7 +21,6 @@
                 <button type="button" onclick="savePathLabels()">保存</button>
             </div>
         </div>
-        <div id="labelModeHint" class="mode-hint">标签模式：日期选择暂时无效</div>
         <div id="dateSelectorPanel" class="date-selector">
             <label>📅 选择日期:</label>
             <div class="calendar">
@@ -123,16 +122,6 @@
             <div id="favoriteSaveStatus" class="favorite-save-status"></div>
             <div id="favoriteList" class="favorite-list"></div>
         </div>
-        <div class="tile-selector">
-            <label>🗺️ 地图源:</label>
-            <select id="tileSelect" onchange="changeTile()">
-                <option value="osm" selected>OpenStreetMap</option>
-                <option value="tracestrack">Tracestrack 瓦片</option>
-                <option value="satellite">卫星地图-Esri World Imagery</option>
-                <option value="tiandituSatellite">卫星地图-天地图</option>
-                <option value="geovisSatellite">卫星地图-星图地球影像</option>
-            </select>
-        </div>
         <div class="info-grid">
             <div class="info-item">
                 <div class="label">轨迹点数</div>
@@ -157,8 +146,16 @@
         </div>
     </div>
     <div class="legend">
-        <div style="font-weight:bold; margin-bottom:8px;">图例</div>
-        <div class="legend-item"><span class="legend-color" style="background:#3388ff;"></span>移动轨迹</div>
+        <div class="tile-selector">
+            <label>🗺️ 地图源:</label>
+            <select id="tileSelect" onchange="changeTile()">
+                <option value="osm" selected>OpenStreetMap</option>
+                <option value="tracestrack">Tracestrack 瓦片</option>
+                <option value="satellite">卫星地图-Esri World Imagery</option>
+                <option value="tiandituSatellite">卫星地图-天地图</option>
+                <option value="geovisSatellite">卫星地图-星图地球影像</option>
+            </select>
+        </div>
         <div id="metricLegend" class="metric-legend">
             <div id="metricLegendTitle" style="font-weight:bold;">可视化路径</div>
             <div class="metric-gradient"></div>

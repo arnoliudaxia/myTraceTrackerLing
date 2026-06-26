@@ -435,7 +435,6 @@ function setDateControlsDisabled(disabled) {
     document.getElementById('dateSelectorPanel').classList.toggle('disabled', disabled);
     var selector = document.getElementById('dateSelect');
     if (selector) selector.disabled = disabled;
-    document.getElementById('labelModeHint').classList.toggle('active', disabled);
 }
 
 function selectedSegmentIndexesForLabeling() {
@@ -652,6 +651,7 @@ function renderFavorites() {
             event.stopPropagation();
             delete pathFavorites[key];
             renderFavorites();
+            renderDateCalendar();
             if (currentDate === date) populateSegmentButtons(allData[currentDate]);
             persistPathFavorites({ showStatus: true });
         };
@@ -692,6 +692,7 @@ async function favoriteSelectedSegments() {
     if (noteInput) noteInput.value = '';
     renderFavorites();
     populateSegmentButtons(allData[currentDate]);
+    renderDateCalendar();
     if (changed) {
         await persistPathFavorites({ showStatus: true });
     }
@@ -817,6 +818,10 @@ function renderDateCalendar() {
         } else {
             button.disabled = true;
         }
+        var hasFavorite = Object.keys(pathFavorites).some(function(key) {
+            return key.indexOf(dateKey + '#') === 0;
+        });
+        if (hasFavorite) button.className += ' favorited';
         if (dateKey === currentDate) button.className += ' active';
         grid.appendChild(button);
     }

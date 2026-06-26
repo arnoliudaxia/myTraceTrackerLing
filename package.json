@@ -7,10 +7,11 @@
   "scripts": {
     "filter": "node scripts/filter-csv-days.mjs",
     "generate": "node scripts/generate-data.mjs",
+    "migrate": "node scripts/migrate-json-to-sqlite.mjs",
     "start": "node server.mjs",
     "dev": "node server.mjs"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   }
 }

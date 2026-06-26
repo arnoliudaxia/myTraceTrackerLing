@@ -1,3 +1,11 @@
+data.db
+data.db-*
+*.db-journal
+*.db-wal
+*.db-shm
 all_dates_points.json
+path_labels.json
+path_favorites.json
 .env
-
+node_modules/
+*.csv

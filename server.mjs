@@ -2,17 +2,20 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  initDatabase,
+  getAllData,
+  getPathLabels,
+  getPathFavorites,
+  setPathLabels,
+  setPathFavorites,
+} from './lib/db.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const rootDir = __dirname;
 const publicDir = path.join(rootDir, 'public');
-const dataFiles = new Map([
-  ['/all_dates_points.json', path.join(rootDir, 'all_dates_points.json')],
-  ['/path_labels.json', path.join(rootDir, 'path_labels.json')],
-  ['/path_favorites.json', path.join(rootDir, 'path_favorites.json')],
-]);
 
 const mimeTypes = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -79,7 +82,7 @@ async function handlePathLabelsSave(req, res) {
       send(res, 400, JSON.stringify({ error: '标签数据必须是对象' }), 'application/json; charset=utf-8');
       return;
     }
-    fs.writeFileSync(path.join(rootDir, 'path_labels.json'), `${JSON.stringify(labels, null, 2)}\n`, 'utf8');
+    setPathLabels(labels);
     send(res, 200, JSON.stringify({ ok: true }), 'application/json; charset=utf-8');
   } catch (error) {
     send(res, 400, JSON.stringify({ error: error.message }), 'application/json; charset=utf-8');
@@ -94,7 +97,7 @@ async function handlePathFavoritesSave(req, res) {
       send(res, 400, JSON.stringify({ error: '收藏数据必须是对象' }), 'application/json; charset=utf-8');
       return;
     }
-    fs.writeFileSync(path.join(rootDir, 'path_favorites.json'), `${JSON.stringify(favorites, null, 2)}\n`, 'utf8');
+    setPathFavorites(favorites);
     send(res, 200, JSON.stringify({ ok: true }), 'application/json; charset=utf-8');
   } catch (error) {
     send(res, 400, JSON.stringify({ error: error.message }), 'application/json; charset=utf-8');
@@ -513,18 +516,30 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && url.pathname === '/all_dates_points.json') {
+    send(res, 200, JSON.stringify(getAllData()), 'application/json; charset=utf-8');
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/path_labels.json') {
+    send(res, 200, JSON.stringify(getPathLabels()), 'application/json; charset=utf-8');
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/path_favorites.json') {
+    send(res, 200, JSON.stringify(getPathFavorites()), 'application/json; charset=utf-8');
+    return;
+  }
+
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     send(res, 405, 'Method not allowed');
     return;
   }
 
-  if (dataFiles.has(url.pathname)) {
-    serveFile(dataFiles.get(url.pathname), res);
-    return;
-  }
-
   serveFile(safePublicPath(url.pathname), res);
 });
+
+initDatabase();
 
 const port = Number(process.env.PORT || 3000);
 server.listen(port, () => {
